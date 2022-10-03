@@ -8,6 +8,8 @@
 #include "our_system.h"
 
 #define CMDLINE_MAX 512
+#define ARG_MAX 16
+#define TOK_LEN_MAX 32
 
 int main(void)
 {
