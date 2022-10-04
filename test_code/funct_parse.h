@@ -19,7 +19,7 @@ char* redir_space(char* cmd)
   int j = 0;
   
   // Looks for the redirect characters < and > inserting spaces surrounding them
-  for(int i = 0; i < strlen(cmd); i++)
+  for(unsigned int i = 0; i < strlen(cmd); i++)
   {
     if(cmd[i] == '<')
     {
@@ -44,6 +44,7 @@ char* redir_space(char* cmd)
       j++;
     }
   }
+  return strdup(buf_cmd);
 }
   
 void funct_parse(char* cmd, char** arg_array)
