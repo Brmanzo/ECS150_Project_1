@@ -10,10 +10,15 @@
 #define ARG_MAX 16
 #define TOK_LEN_MAX 32
 
+/* This function inserts spaces surrounding the redirect characters */
+/* in order to account for the edge case where there is no space    */
 char* redir_space(char* cmd);
-  
+
+/* This function splits the input cmd string into an array of strings */
+/* by treating spaces as tokens                                       */
 int funct_parse(char* cmd, char** arg_array);
 
+/* Custom system function to execute the shell command */
 int our_system(const char *cmd);
 
 int main(void)
@@ -32,7 +37,7 @@ int main(void)
 
                 /* Get command line */
                 fgets(cmd, CMDLINE_MAX, stdin);
-
+		
                 /* Print command line if stdin is not provided by terminal */
                 if (!isatty(STDIN_FILENO)) {
                         printf("%s", cmd);
@@ -43,10 +48,15 @@ int main(void)
                 nl = strchr(cmd, '\n');
                 if (nl)
                         *nl = '\0';
-
-                /* Builtin command */
+		
+		/* Parses arguments from string cmd into array of solitary */
+		/* strings, each its own argument or token (<, >, |)       */
+		
                 int arg_num = funct_parse(cmd, arg_array);
-                
+                		
+		/* Exit must be within main in order to break from program */
+		/* instead of breaking from a fork                         */
+		
                 for(int i = 0; i < arg_num; i++)
                 {
                         printf("%s\n", arg_array[i]);
@@ -55,20 +65,15 @@ int main(void)
                 if (!strcmp(arg_array[0], "exit")) {
                         fprintf(stderr, "Bye...\n");
                         break;
-                }
-                else if (!strcmp(arg_array[0], "cd")) {
-                        fprintf(stderr, "command cd detected");
-                }
-                else if (!strcmp(arg_array[0], "pwd")) {
-                        fprintf(stderr, "command pwd detected");
-                }
                 
-                /* Regular command */
+                /* Calls System to execute non-exit command, actual command*/
+		/* identification takes place in our_system function       */
                 retval = our_system(cmd);
+			
+		/* Returns value from non-exit command */
                 fprintf(stdout, "Return status value for '%s': %d\n",
                         cmd, retval);
         }
-
         return EXIT_SUCCESS;
 }
 
@@ -98,7 +103,7 @@ char* redir_space(char* cmd)
   char buf_cmd[CMDLINE_MAX];
   int j = 0;
   
-  // Looks for the redirect characters < and > inserting spaces surrounding them
+  /* Looks for the characters < and > and inserts spaces surrounding them */
   for(unsigned int i = 0; i < strlen(cmd); i++)
   {
     if(cmd[i] == '<')
@@ -118,7 +123,7 @@ char* redir_space(char* cmd)
       j++;
       buf_cmd[j] = ' ';
       j++;
-    // Otherwise it simply buffers the character into the new array
+    /* Otherwise it simply buffers the character into the new array */
     } else {
       buf_cmd[j] = cmd[i];
       j++;
@@ -129,13 +134,15 @@ char* redir_space(char* cmd)
   
 int funct_parse(char* cmd, char** arg_array)
 {
-  // Inserts spaces surrounding redirection characters
+  /* Inserts spaces surrounding redirection characters */
   char* buf_arr = redir_space(cmd);
 
   int arg_num = 0;
   
   char* cmd_arg = strtok(buf_arr, " ");
-
+  
+  /* Splits cmd string into an array of strings according */
+  /* to the position of interleaven spaces                */
   while(cmd_arg != NULL)
   {
     arg_array[arg_num] = cmd_arg;
