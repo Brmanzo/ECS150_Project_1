@@ -5,7 +5,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include "our_system.h"
 
 #define CMDLINE_MAX 512
 #define ARG_MAX 16
@@ -19,7 +18,9 @@ int our_system(const char *cmd);
 
 int main(void)
 {
+        char* arg_array[ARG_MAX];
         char cmd[CMDLINE_MAX];
+        int arg_num = 0;
 
         while (1) {
                 char *nl;
@@ -44,11 +45,24 @@ int main(void)
                         *nl = '\0';
 
                 /* Builtin command */
-                if (!strcmp(cmd, "exit")) {
+                int arg_num = funct_parse(cmd, arg_array);
+                
+                for(int i = 0; i < arg_num; i++)
+                {
+                        printf("%s\n", arg_array[i]);
+                }
+                
+                if (!strcmp(arg_array[0], "exit")) {
                         fprintf(stderr, "Bye...\n");
                         break;
                 }
-
+                else if (!strcmp(arg_array[0], "cd")) {
+                        fprintf(stderr, "command cd detected");
+                }
+                else if (!strcmp(arg_array[0], "pwd")) {
+                        fprintf(stderr, "command pwd detected");
+                }
+                
                 /* Regular command */
                 retval = our_system(cmd);
                 fprintf(stdout, "Return status value for '%s': %d\n",
