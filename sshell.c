@@ -49,13 +49,13 @@ int main(void)
                 if (nl)
                         *nl = '\0';
 		
-		/* Parses arguments from string cmd into array of solitary */
-		/* strings, each its own argument or token (<, >, |)       */
+		            /* Parses arguments from string cmd into array of solitary */
+		            /* strings, each its own argument or token (<, >, |)       */
 		
                 int arg_num = funct_parse(cmd, arg_array);
                 		
-		/* Exit must be within main in order to break from program */
-		/* instead of breaking from a fork                         */
+		            /* Exit must be within main in order to break from program */
+          		  /* instead of breaking from a fork                         */
 		
                 for(int i = 0; i < arg_num; i++)
                 {
@@ -67,91 +67,97 @@ int main(void)
                         break;
                 
                 /* Calls System to execute non-exit command, actual command*/
-		/* identification takes place in our_system function       */
+		            /* identification takes place in our_system function       */
                 retval = our_system(cmd);
 			
-		/* Returns value from non-exit command */
+		            /* Returns value from non-exit command */
                 fprintf(stdout, "Return status value for '%s': %d\n",
                         cmd, retval);
         }
         return EXIT_SUCCESS;
 }
 
-int our_system(const char *cmd) {
-	int status;
-	pid_t pid;
+int our_system(const char *cmd) 
+{
+        int status;
+        pid_t pid;
 
-	pid = fork();
-	if(pid == 0){ // Child
-		/* using execl for convenience, -p to access PATH variables */
-		execlp(cmd, cmd, NULL);
-		_exit(EXIT_FAILURE);
-	} else if(pid < 0) {
-		/* The fork failed. Report failure */
-		status = -1;
-	} else {
-		/*This is the parent process. Wait for the child to complete */	
-		  if( waitpid( pid, &status,0)!= pid){
-		  	status = -1;
-		  }
-  }
-return status;
+        pid = fork();
+        /* Child Path */
+        if(pid == 0)
+        {
+        /* using execl for convenience, -p to access PATH variables */
+                execlp(cmd, cmd, NULL);
+                _exit(EXIT_FAILURE);
+        }
+        /* The fork failed. Report failure */
+        else if(pid < 0)
+        {
+                status = -1;
+        } else {
+		            /*This is the parent process. Wait for the child to complete */	
+		            if( waitpid( pid, &status,0)!= pid)
+                {
+		  	                status = -1;
+		            }
+        }
+        return status;
 }
 
 char* redir_space(char* cmd)
 {
-  char buf_cmd[CMDLINE_MAX];
-  int j = 0;
+        char buf_cmd[CMDLINE_MAX];
+        int j = 0;
   
-  /* Looks for the characters < and > and inserts spaces surrounding them */
-  for(unsigned int i = 0; i < strlen(cmd); i++)
-  {
-    if(cmd[i] == '<')
-    {
-      buf_cmd[j] = ' ';
-      j++;
-      buf_cmd[j] = '<';
-      j++;
-      buf_cmd[j] = ' ';
-      j++;
-    }
-    else if(cmd[i] == '>')
-    {
-      buf_cmd[j] = ' ';
-      j++;
-      buf_cmd[j] = '>';
-      j++;
-      buf_cmd[j] = ' ';
-      j++;
-    /* Otherwise it simply buffers the character into the new array */
-    } else {
-      buf_cmd[j] = cmd[i];
-      j++;
-    }
-  }
-  return strdup(buf_cmd);
+        /* Looks for the characters < and > and inserts spaces surrounding them */
+        for(unsigned int i = 0; i < strlen(cmd); i++)
+        {
+                if(cmd[i] == '<')
+                {
+                        buf_cmd[j] = ' ';
+                        j++;
+                        buf_cmd[j] = '<';
+                        j++;
+                        buf_cmd[j] = ' ';
+                        j++;
+                }
+                else if(cmd[i] == '>')
+                {
+                      buf_cmd[j] = ' ';
+                      j++;
+                      buf_cmd[j] = '>';
+                      j++;
+                      buf_cmd[j] = ' ';
+                      j++;
+              /* Otherwise it simply buffers the character into the new array */
+              } else {
+                      buf_cmd[j] = cmd[i];
+                      j++;
+              }
+        }
+        return strdup(buf_cmd);
 }
   
 int funct_parse(char* cmd, char** arg_array)
 {
   /* Inserts spaces surrounding redirection characters */
-  char* buf_arr = redir_space(cmd);
+        char* buf_arr = redir_space(cmd);
 
-  int arg_num = 0;
+        int arg_num = 0;
   
-  char* cmd_arg = strtok(buf_arr, " ");
+        char* cmd_arg = strtok(buf_arr, " ");
   
-  /* Splits cmd string into an array of strings according */
-  /* to the position of interleaven spaces                */
-  while(cmd_arg != NULL)
-  {
-    arg_array[arg_num] = cmd_arg;
+        /* Splits cmd string into an array of strings according */
+        /* to the position of interleaven spaces                */
+        while(cmd_arg != NULL)
+        {
+                arg_array[arg_num] = cmd_arg;
 
-    cmd_arg = strtok(NULL, " ");
-    arg_num++;
-  }
-  return arg_num;
-     
+                cmd_arg = strtok(NULL, " ");
+                arg_num++;
+        }
+        /* Returns number of strings in new array */
+        return arg_num;  
 }
 
 
