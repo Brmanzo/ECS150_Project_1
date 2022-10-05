@@ -12,39 +12,39 @@
 
 
 
-// Takes in the command line and the redirect character of choice
+// Takes in the command line and returns the new array with spaces
 char* redir_space(char* cmd)
 {
   char buf_cmd[CMDLINE_MAX];
   int j = 0;
   
   // Looks for the redirect characters < and > inserting spaces surrounding them
-  for(int i = 0; i < strlen(cmd); i++)
+  for(unsigned int i = 0; i < strlen(cmd); i++)
   {
     if(cmd[i] == '<')
     {
-        buf_cmd[j] = ' ';
-        j++;
-        buf_cmd[j] = '<';
-        j++;
-        buf_cmd[j] = ' ';
-        j++;
+      buf_cmd[j] = ' ';
+      j++;
+      buf_cmd[j] = '<';
+      j++;
+      buf_cmd[j] = ' ';
+      j++;
     }
     else if(cmd[i] == '>')
     {
-        buf_cmd[j] = ' ';
-        j++;
-        buf_cmd[j] = '>';
-        j++;
-        buf_cmd[j] = ' ';
-        j++;
-    // Otherwise it simply buffers the character
+      buf_cmd[j] = ' ';
+      j++;
+      buf_cmd[j] = '>';
+      j++;
+      buf_cmd[j] = ' ';
+      j++;
+    // Otherwise it simply buffers the character into the new array
     } else {
-        buf_cmd[j] = cmd[i];
-        j++;
+      buf_cmd[j] = cmd[i];
+      j++;
     }
-
   }
+  return strdup(buf_cmd);
 }
   
 void funct_parse(char* cmd, char** arg_array)
@@ -56,12 +56,12 @@ void funct_parse(char* cmd, char** arg_array)
   
   char* cmd_arg = strtok(buf_arr, " ");
   
-  strcpy(arg_array[arg_num], cmd_arg);
+  arg_array[arg_num] = cmd_arg;
   arg_num++;
 
   while(cmd_arg != NULL)
   {
-    strcpy(arg_array[arg_num], cmd_arg);
+    arg_array[arg_num] = cmd_arg;
 
     cmd_arg = strtok(NULL, " ");
     arg_num++;
