@@ -21,6 +21,9 @@ int funct_parse(char* cmd, char** arg_array);
 /* Custom system function to execute the shell command */
 int our_system(const char *cmd);
 
+/* function to clear the array of strings buffer */
+void buf_clear(int arg_num, char** arg_array);
+
 int main(void)
 {
         char* arg_array[ARG_MAX];
@@ -49,9 +52,11 @@ int main(void)
                 if (nl)
                         *nl = '\0';
 		
+                /* clears memory of arg_array buffer */
+                buf_clear(arg_num, arg_array);
+   
 		            /* Parses arguments from string cmd into array of solitary */
 		            /* strings, each its own argument or token (<, >, |)       */
-		
                 int arg_num = funct_parse(cmd, arg_array);
                 		
 		            /* Exit must be within main in order to break from program */
@@ -77,31 +82,26 @@ int main(void)
         return EXIT_SUCCESS;
 }
 
-int our_system(const char *cmd) 
+int funct_parse(char* cmd, char** arg_array)
 {
-        int status;
-        pid_t pid;
+  /* Inserts spaces surrounding redirection characters */
+        char* buf_arr = redir_space(cmd);
 
-        pid = fork();
-        /* Child Path */
-        if(pid == 0)
+        int arg_num = 0;
+  
+        char* cmd_arg = strtok(buf_arr, " ");
+  
+        /* Splits cmd string into an array of strings according */
+        /* to the position of interleaven spaces                */
+        while(cmd_arg != NULL)
         {
-        /* using execl for convenience, -p to access PATH variables */
-                execlp(cmd, cmd, NULL);
-                _exit(EXIT_FAILURE);
+                arg_array[arg_num] = cmd_arg;
+
+                cmd_arg = strtok(NULL, " ");
+                arg_num++;
         }
-        /* The fork failed. Report failure */
-        else if(pid < 0)
-        {
-                status = -1;
-        } else {
-		            /*This is the parent process. Wait for the child to complete */	
-		            if( waitpid( pid, &status,0)!= pid)
-                {
-		  	                status = -1;
-		            }
-        }
-        return status;
+        /* Returns number of strings in new array */
+        return arg_num;  
 }
 
 char* redir_space(char* cmd)
@@ -137,28 +137,40 @@ char* redir_space(char* cmd)
         }
         return strdup(buf_cmd);
 }
-  
-int funct_parse(char* cmd, char** arg_array)
+
+int our_system(const char *cmd) 
 {
-  /* Inserts spaces surrounding redirection characters */
-        char* buf_arr = redir_space(cmd);
+        int status;
+        pid_t pid;
 
-        int arg_num = 0;
-  
-        char* cmd_arg = strtok(buf_arr, " ");
-  
-        /* Splits cmd string into an array of strings according */
-        /* to the position of interleaven spaces                */
-        while(cmd_arg != NULL)
+        pid = fork();
+        /* Child Path */
+        if(pid == 0)
         {
-                arg_array[arg_num] = cmd_arg;
-
-                cmd_arg = strtok(NULL, " ");
-                arg_num++;
+        /* using execl for convenience, -p to access PATH variables */
+                execlp(cmd, cmd, NULL);
+                _exit(EXIT_FAILURE);
         }
-        /* Returns number of strings in new array */
-        return arg_num;  
+        /* The fork failed. Report failure */
+        else if(pid < 0)
+        {
+                status = -1;
+        } else {
+		            /*This is the parent process. Wait for the child to complete */	
+		            if( waitpid( pid, &status,0)!= pid)
+                {
+		  	                status = -1;
+		            }
+        }
+        return status;
 }
 
+void buf_clear(int arg_num, char** arg_array)
+{
+        for(int i = 0; i < arg_num; i++)
+        {
+                 memset(arg_array[i], 0, strlen(arg_array[i]));
+        }
+}      
 
 #endif //SSHELL_C_

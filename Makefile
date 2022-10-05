@@ -1,5 +1,5 @@
-sshell:  sshell.c  our_system.h
-	gcc	-Wall	-Werror	sshell.c  -o	sshell
+sshell:  sshell.c
+	gcc	-Wall	-Wextra	-Werror	-g	sshell.c	-o	sshell
 
 clean:
-	rm	sshell  our_system  $(objects)
+	rm	sshell	$(objects)
