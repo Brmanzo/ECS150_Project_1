@@ -165,7 +165,8 @@ int main(void)
             /* identification takes place in our_system function       */
             retval = our_system(arg_array);
 
-            /* Returns value from non-exit command */
+            
+	    /* Returns value from non-exit command */
             fprintf(stdout, "Return status value for '%s': %d\n",
                 cmd, retval);
         }
