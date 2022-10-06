@@ -17,6 +17,7 @@
 char* redir_space(char* cmd)
 {
     char buf_cmd[CMDLINE_MAX];
+    memset(buf_cmd, 0, sizeof(buf_cmd));
     int j = 0;
 
     /* Looks for the characters < and > and inserts spaces surrounding them */
@@ -83,7 +84,7 @@ int our_system(char** arg_array)
     /* Child Path */
     if (pid == 0)
     {
-        /* using execl for convenience, -p to access PATH variables */
+        /* using execv for convenience, -p to access PATH variables */
         execvp(arg_array[0], arg_array);
         _exit(EXIT_FAILURE);
     }
@@ -106,9 +107,10 @@ int our_system(char** arg_array)
 void buf_clear(int arg_num,  char** arg_array)
 {
 
+/*	
 	printf("\narg_num == %d\n",arg_num);
 	fflush(stdout);
-        
+*/
 
             for (int i = 0; i < arg_num; i++)
             {
@@ -122,6 +124,8 @@ int main(void)
         char cmd[CMDLINE_MAX];
         int arg_num = 0;
 
+	static int test_instance = 0;
+
         while (1) {
             char* nl;
             int retval;
@@ -132,8 +136,9 @@ int main(void)
 
             /* clears memory of arg_array buffer */
             buf_clear(arg_num, arg_array);
+ 	    //fpurge(stdin);
 
-            /* Get command line */
+	    /* Get command line */
             fgets(cmd, CMDLINE_MAX, stdin);
 
             /* Print command line if stdin is not provided by terminal */
@@ -156,6 +161,7 @@ int main(void)
             for (int i = 0; i < arg_num; i++)
             {
                 printf("%s\n", arg_array[i]);
+		fflush(stdout);
             }
             if (!strcmp(arg_array[0], "exit")) {
                 fprintf(stderr, "Bye...\n");
@@ -165,7 +171,6 @@ int main(void)
             /* identification takes place in our_system function       */
             retval = our_system(arg_array);
 
-            
 	    /* Returns value from non-exit command */
             fprintf(stdout, "Return status value for '%s': %d\n",
                 cmd, retval);
