@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/types.h> 
+#include <sys/wait.h> 
 
 #define CMDLINE_MAX 512
 #define ARG_MAX 16
@@ -12,17 +14,102 @@
 
 /* This function inserts spaces surrounding the redirect characters */
 /* in order to account for the edge case where there is no space    */
-char* redir_space(char* cmd);
+char* redir_space(char* cmd)
+{
+    char buf_cmd[CMDLINE_MAX];
+    int j = 0;
+
+    /* Looks for the characters < and > and inserts spaces surrounding them */
+    for (unsigned int i = 0; i < strlen(cmd); i++)
+    {
+        if (cmd[i] == '<')
+        {
+            buf_cmd[j] = ' ';
+            j++;
+            buf_cmd[j] = '<';
+            j++;
+            buf_cmd[j] = ' ';
+            j++;
+        }
+        else if (cmd[i] == '>')
+        {
+            buf_cmd[j] = ' ';
+            j++;
+            buf_cmd[j] = '>';
+            j++;
+            buf_cmd[j] = ' ';
+            j++;
+            /* Otherwise it simply buffers the character into the new array */
+        }
+        else {
+            buf_cmd[j] = cmd[i];
+            j++;
+        }
+    }
+    return strdup(buf_cmd);
+}
 
 /* This function splits the input cmd string into an array of strings */
 /* by treating spaces as tokens                                       */
-int funct_parse(char* cmd, char** arg_array);
+int funct_parse(char* cmd, char** arg_array)
+{
+    /* Inserts spaces surrounding redirection characters */
+    char* buf_arr = redir_space(cmd);
+
+    int arg_num = 0;
+
+    char* cmd_arg = strtok(buf_arr, " ");
+
+    /* Splits cmd string into an array of strings according */
+    /* to the position of interleaven spaces                */
+    while (cmd_arg != NULL)
+    {
+        arg_array[arg_num] = cmd_arg;
+
+        cmd_arg = strtok(NULL, " ");
+        arg_num++;
+    }
+    /* Returns number of strings in new array */
+    return arg_num;
+}
 
 /* Custom system function to execute the shell command */
-int our_system(const char *cmd);
+int our_system(char** arg_array)
+{
+    int status;
+    pid_t pid;
+
+    pid = fork();
+    /* Child Path */
+    if (pid == 0)
+    {
+        /* using execl for convenience, -p to access PATH variables */
+        execvp(arg_array[0], arg_array);
+        _exit(EXIT_FAILURE);
+    }
+    /* The fork failed. Report failure */
+    else if (pid < 0)
+    {
+        status = -1;
+    }
+    else {
+        /*This is the parent process. Wait for the child to complete */
+        if (waitpid(pid, &status, 0) != pid)
+        {
+            status = -1;
+        }
+    }
+    return status;
+}
 
 /* function to clear the array of strings buffer */
-void buf_clear(int arg_num, char** arg_array);
+void buf_clear(int arg_num,  char** arg_array)
+{
+            for (int i = 0; i < arg_num; i++)
+            {
+                memset(arg_array[i], ' ', strlen(arg_array[i]));
+            }
+}     
 
 int main(void)
 {
@@ -31,146 +118,52 @@ int main(void)
         int arg_num = 0;
 
         while (1) {
-                char *nl;
-                int retval;
+            char* nl;
+            int retval;
 
-                /* Print prompt */
-                printf("sshell$ ");
+            /* Print prompt */
+            printf("sshell$ ");
+            fflush(stdout);
+
+            /* clears memory of arg_array buffer */
+            buf_clear(arg_num, arg_array);
+
+            /* Get command line */
+            fgets(cmd, CMDLINE_MAX, stdin);
+
+            /* Print command line if stdin is not provided by terminal */
+            if (!isatty(STDIN_FILENO)) {
+                printf("%s", cmd);
                 fflush(stdout);
+            }
+            /* Remove trailing newline from command line */
+            nl = strchr(cmd, '\n');
+            if (nl)
+                *nl = '\0';
 
-                /* Get command line */
-                fgets(cmd, CMDLINE_MAX, stdin);
-		
-                /* Print command line if stdin is not provided by terminal */
-                if (!isatty(STDIN_FILENO)) {
-                        printf("%s", cmd);
-                        fflush(stdout);
-                }
+            /* Parses arguments from string cmd into array of solitary */
+            /* strings, each its own argument or token (<, >, |)       */
+            int arg_num = funct_parse(cmd, arg_array);
 
-                /* Remove trailing newline from command line */
-                nl = strchr(cmd, '\n');
-                if (nl)
-                        *nl = '\0';
-		
-                /* clears memory of arg_array buffer */
-                buf_clear(arg_num, arg_array);
-   
-		            /* Parses arguments from string cmd into array of solitary */
-		            /* strings, each its own argument or token (<, >, |)       */
-                int arg_num = funct_parse(cmd, arg_array);
-                		
-		            /* Exit must be within main in order to break from program */
-          		  /* instead of breaking from a fork                         */
-		
-                for(int i = 0; i < arg_num; i++)
-                {
-                        printf("%s\n", arg_array[i]);
-                }
-                
-                if (!strcmp(arg_array[0], "exit")) {
-                        fprintf(stderr, "Bye...\n");
-                        break;
-                
-                /* Calls System to execute non-exit command, actual command*/
-		            /* identification takes place in our_system function       */
-                retval = our_system(cmd);
-			
-		            /* Returns value from non-exit command */
-                fprintf(stdout, "Return status value for '%s': %d\n",
-                        cmd, retval);
+            /* Exit must be within main in order to break from program */
+            /* instead of breaking from a fork                         */
+
+            for (int i = 0; i < arg_num; i++)
+            {
+                printf("%s\n", arg_array[i]);
+            }
+            if (!strcmp(arg_array[0], "exit")) {
+                fprintf(stderr, "Bye...\n");
+                break;
+            }
+            /* Calls System to execute non-exit command, actual command*/
+            /* identification takes place in our_system function       */
+            retval = our_system(arg_array);
+
+            /* Returns value from non-exit command */
+            fprintf(stdout, "Return status value for '%s': %d\n",
+                cmd, retval);
         }
         return EXIT_SUCCESS;
 }
-
-int funct_parse(char* cmd, char** arg_array)
-{
-  /* Inserts spaces surrounding redirection characters */
-        char* buf_arr = redir_space(cmd);
-
-        int arg_num = 0;
-  
-        char* cmd_arg = strtok(buf_arr, " ");
-  
-        /* Splits cmd string into an array of strings according */
-        /* to the position of interleaven spaces                */
-        while(cmd_arg != NULL)
-        {
-                arg_array[arg_num] = cmd_arg;
-
-                cmd_arg = strtok(NULL, " ");
-                arg_num++;
-        }
-        /* Returns number of strings in new array */
-        return arg_num;  
-}
-
-char* redir_space(char* cmd)
-{
-        char buf_cmd[CMDLINE_MAX];
-        int j = 0;
-  
-        /* Looks for the characters < and > and inserts spaces surrounding them */
-        for(unsigned int i = 0; i < strlen(cmd); i++)
-        {
-                if(cmd[i] == '<')
-                {
-                        buf_cmd[j] = ' ';
-                        j++;
-                        buf_cmd[j] = '<';
-                        j++;
-                        buf_cmd[j] = ' ';
-                        j++;
-                }
-                else if(cmd[i] == '>')
-                {
-                      buf_cmd[j] = ' ';
-                      j++;
-                      buf_cmd[j] = '>';
-                      j++;
-                      buf_cmd[j] = ' ';
-                      j++;
-              /* Otherwise it simply buffers the character into the new array */
-              } else {
-                      buf_cmd[j] = cmd[i];
-                      j++;
-              }
-        }
-        return strdup(buf_cmd);
-}
-
-int our_system(const char *cmd) 
-{
-        int status;
-        pid_t pid;
-
-        pid = fork();
-        /* Child Path */
-        if(pid == 0)
-        {
-        /* using execl for convenience, -p to access PATH variables */
-                execlp(cmd, cmd, NULL);
-                _exit(EXIT_FAILURE);
-        }
-        /* The fork failed. Report failure */
-        else if(pid < 0)
-        {
-                status = -1;
-        } else {
-		            /*This is the parent process. Wait for the child to complete */	
-		            if( waitpid( pid, &status,0)!= pid)
-                {
-		  	                status = -1;
-		            }
-        }
-        return status;
-}
-
-void buf_clear(int arg_num, char** arg_array)
-{
-        for(int i = 0; i < arg_num; i++)
-        {
-                 memset(arg_array[i], 0, strlen(arg_array[i]));
-        }
-}      
-
 #endif //SSHELL_C_
