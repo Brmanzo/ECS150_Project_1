@@ -124,7 +124,6 @@ int main(void)
         char cmd[CMDLINE_MAX];
         int arg_num = 0;
 
-	static int test_instance = 0;
 
         while (1) {
             char* nl;
