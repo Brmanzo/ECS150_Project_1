@@ -66,8 +66,8 @@ int funct_parse(char* cmd, char** arg_array)
     {
         arg_array[arg_num] = cmd_arg;
 
-        cmd_arg = strtok(NULL, " ");
         arg_num++;
+        cmd_arg = strtok(NULL, " ");
     }
     /* Returns number of strings in new array */
     return arg_num;
@@ -105,6 +105,11 @@ int our_system(char** arg_array)
 /* function to clear the array of strings buffer */
 void buf_clear(int arg_num,  char** arg_array)
 {
+
+	printf("\narg_num == %d\n",arg_num);
+	fflush(stdout);
+        
+
             for (int i = 0; i < arg_num; i++)
             {
                 memset(arg_array[i], ' ', strlen(arg_array[i]));
@@ -143,7 +148,7 @@ int main(void)
 
             /* Parses arguments from string cmd into array of solitary */
             /* strings, each its own argument or token (<, >, |)       */
-            int arg_num = funct_parse(cmd, arg_array);
+            arg_num = funct_parse(cmd, arg_array);
 
             /* Exit must be within main in order to break from program */
             /* instead of breaking from a fork                         */
