@@ -7,10 +7,25 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <dirent.h>
 
 #define CMDLINE_MAX 512
 #define ARG_MAX 16
 #define TOK_LEN_MAX 32
+
+enum{
+    TOO_MANY_ARGS
+};
+
+void error_handler(int error_code)
+{
+    switch (error_code)
+    {
+        case TOO_MANY_ARGS:
+            fprintf(stderr, "Error: too many process arguments\n");
+            break;
+    }
+}
 
 /* This function inserts spaces surrounding the redirect characters */
 /* in order to account for the edge case where there is no space    */
@@ -70,6 +85,10 @@ int funct_parse(char* cmd, char** arg_array)
         arg_num++;
         cmd_arg = strtok(NULL, " ");
     }
+    if (arg_num > ARG_MAX)
+    {
+        error_handler(0);
+    }
     arg_num++;
     arg_array[arg_num] = NULL;
     /* Returns number of strings in new array */
@@ -120,54 +139,70 @@ int main(void)
     char cmd[CMDLINE_MAX];
     int arg_num = 0;
 
-    while (1) {
-    char* nl;
-    int retval;
+    //DIR* dp;
 
-    /* Print prompt */
-    printf("sshell$ ");
-    fflush(stdout);
-
-    /* clears memory of arg_array buffer */
-    buf_clear(arg_num, arg_array);
-
-    /* Get command line */
-    fgets(cmd, CMDLINE_MAX, stdin);
-
-    /* Print command line if stdin is not provided by terminal */
-    if (!isatty(STDIN_FILENO))
+    while (1)
     {
-        printf("%s", cmd);
+        char* nl;
+        int retval;
+
+        /* Print prompt */
+        printf("sshell$ ");
         fflush(stdout);
-    }
-    /* Remove trailing newline from command line */
-    nl = strchr(cmd, '\n');
-    if (nl)
-        *nl = '\0';
 
-    /* Parses arguments from string cmd into array of solitary */
-    /* strings, each its own argument or token (<, >, |)       */
-    arg_num = funct_parse(cmd, arg_array);
+        /* clears memory of arg_array buffer */
+        buf_clear(arg_num, arg_array);
 
-    /* Exit must be within main in order to break from program */
-    /* instead of breaking from a fork                         */
+        /* Get command line */
+        fgets(cmd, CMDLINE_MAX, stdin);
 
-    //for (int i = 0; i < arg_num; i++)
-    //{
-    //    printf("%s\n", arg_array[i]);
-    //    fflush(stdout);
-    //}
-    if (!strcmp(arg_array[0], "exit")) {
-        fprintf(stderr, "Bye...\n");
-        break;
-    }
-    /* Calls System to execute non-exit command, actual command*/
-    /* identification takes place in our_system function       */
-    retval = our_system(arg_array);
+        /* Print command line if stdin is not provided by terminal */
+        if (!isatty(STDIN_FILENO))
+        {
+            printf("%s", cmd);
+            fflush(stdout);
+        }
+        /* Remove trailing newline from command line */
+        nl = strchr(cmd, '\n');
+        if (nl)
+            *nl = '\0';
 
-    /* Returns value from non-exit command */
-    fprintf(stdout, "Return status value for '%s': %d\n",
-        cmd, retval);
+        /* Parses arguments from string cmd into array of solitary */
+        /* strings, each its own argument or token (<, >, |)       */
+        arg_num = funct_parse(cmd, arg_array);
+
+        /* Exit must be within main in order to break from program */
+        /* instead of breaking from a fork                         */
+        if (!strcmp(arg_array[0], "exit"))
+        {
+            fprintf(stderr, "Bye...\n");
+            break;
+        }
+        else if (!strcmp(arg_array[0], "pwd"))
+        {
+            char buffer[CMDLINE_MAX - 3];
+
+            char* cwd = getcwd(buffer, CMDLINE_MAX - 3);
+            fprintf(stdout, "%s\n", cwd);
+            fprintf(stderr, "+ completed '%s' [0]\n", cmd);
+        }
+        //else if(!strcmp(arg_array[0], "cd"))
+        //{
+        //    dp = opendir(arg_array[1]);
+        //    if (dp == NULL) {
+        //        printf(stderr, "Error: cannot cd into directory");
+        //        break;
+        //    }
+        //}
+        else {
+            /* Calls System to execute non-exit command, actual command*/
+            /* identification takes place in our_system function       */
+            retval = our_system(arg_array);
+
+            /* Returns value from non-exit command */
+            fprintf(stdout, "Return status value for '%s': %d\n",
+                cmd, retval);
+        }
     }
     return EXIT_SUCCESS;
 }
