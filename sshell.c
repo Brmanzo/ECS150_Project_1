@@ -16,7 +16,7 @@
 /* in order to account for the edge case where there is no space    */
 char* redir_space(char* cmd)
 {
-    char buf_cmd[CMDLINE_MAX];
+    char buf_cmd[CMDLINE_MAX+1];
     memset(buf_cmd, 0, sizeof(buf_cmd));
     int j = 0;
 
@@ -70,6 +70,8 @@ int funct_parse(char* cmd, char** arg_array)
         arg_num++;
         cmd_arg = strtok(NULL, " ");
     }
+    arg_num++;
+    arg_array[arg_num] = NULL;
     /* Returns number of strings in new array */
     return arg_num;
 }
@@ -84,7 +86,7 @@ int our_system(char** arg_array)
     /* Child Path */
     if (pid == 0)
     {
-        /* using execv for convenience, -p to access PATH variables */
+        /* using execv for array of arguments, -p to access PATH variables */
         execvp(arg_array[0], arg_array);
         _exit(EXIT_FAILURE);
     }
@@ -106,9 +108,9 @@ int our_system(char** arg_array)
 /* function to clear the array of strings buffer */
 void buf_clear(int arg_num,  char** arg_array)
 {
-    for (int i = 0; i < arg_num; i++)
+    for (int i = 0; i < arg_num - 1; i++)
     {
-        memset(arg_array[i], ' ', strlen(arg_array[i]));
+        memset(arg_array[i], 0, strlen(arg_array[i]));
     }
 }
 
@@ -150,11 +152,11 @@ int main(void)
     /* Exit must be within main in order to break from program */
     /* instead of breaking from a fork                         */
 
-    for (int i = 0; i < arg_num; i++)
-    {
-        printf("%s\n", arg_array[i]);
-        fflush(stdout);
-    }
+    //for (int i = 0; i < arg_num; i++)
+    //{
+    //    printf("%s\n", arg_array[i]);
+    //    fflush(stdout);
+    //}
     if (!strcmp(arg_array[0], "exit")) {
         fprintf(stderr, "Bye...\n");
         break;
