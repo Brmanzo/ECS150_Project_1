@@ -13,7 +13,7 @@
 #define ARG_MAX 16
 #define TOK_LEN_MAX 32
 
-enum{
+enum {
     TOO_MANY_ARGS
 };
 
@@ -21,9 +21,9 @@ void error_handler(int error_code)
 {
     switch (error_code)
     {
-        case TOO_MANY_ARGS:
-            fprintf(stderr, "Error: too many process arguments\n");
-            break;
+    case TOO_MANY_ARGS:
+        fprintf(stderr, "Error: too many process arguments\n");
+        break;
     }
 }
 
@@ -31,7 +31,7 @@ void error_handler(int error_code)
 /* in order to account for the edge case where there is no space    */
 char* redir_space(char* cmd)
 {
-    char buf_cmd[CMDLINE_MAX+1];
+    char buf_cmd[CMDLINE_MAX + 1];
     memset(buf_cmd, 0, sizeof(buf_cmd));
     int j = 0;
 
@@ -74,7 +74,7 @@ int funct_parse(char* cmd, char** arg_array)
 
     int arg_num = 0;
 
-    char* cmd_arg = strtok(buf_arr, " ");
+    char* cmd_arg = strtok(buf_arr, " \n");
 
     /* Splits cmd string into an array of strings according */
     /* to the position of interleaven spaces                */
@@ -105,9 +105,42 @@ int our_system(char** arg_array)
     /* Child Path */
     if (pid == 0)
     {
-        /* using execv for array of arguments, -p to access PATH variables */
-        execvp(arg_array[0], arg_array);
-        _exit(EXIT_FAILURE);
+        if (!strcmp(arg_array[0], "pwd"))
+        {
+            char buffer[CMDLINE_MAX - 3];
+
+            char* cwd = getcwd(buffer, CMDLINE_MAX - 3);
+            fprintf(stdout, "%s\n", cwd);
+        }
+        //else if (!strcmp(arg_array[0], "ls"))
+        //{
+        //    DIR* dp;
+        //    struct dirent* ep;
+
+        //    dp = opendir(arg_array[1]);
+        //    if (dp != NULL)
+        //    {
+        //        while (ep = readdir(dp))
+        //            puts(ep->d_name);
+        //        (void)closedir(dp);
+        //    } else {
+        //        printf(stderr, "cannot access '%s': No such file or directory", arg_array[1]);
+        //        break;
+        //    }
+        //}
+        //else if(!strcmp(arg_array[0], "cd"))
+        //{
+        //    dp = opendir(arg_array[1]);
+        //    if (dp == NULL) {
+        //        printf(stderr, "Error: cannot cd into directory");
+        //        break;
+        //    }
+        //}
+        else {
+            /* using execv for array of arguments, -p to access PATH variables */
+            execvp(arg_array[0], arg_array);
+            _exit(EXIT_FAILURE);
+        }
     }
     /* The fork failed. Report failure */
     else if (pid < 0)
@@ -125,7 +158,7 @@ int our_system(char** arg_array)
 }
 
 /* function to clear the array of strings buffer */
-void buf_clear(int arg_num,  char** arg_array)
+void buf_clear(int arg_num, char** arg_array)
 {
     for (int i = 0; i < arg_num - 1; i++)
     {
@@ -150,9 +183,6 @@ int main(void)
         printf("sshell$ ");
         fflush(stdout);
 
-        /* clears memory of arg_array buffer */
-        buf_clear(arg_num, arg_array);
-
         /* Get command line */
         fgets(cmd, CMDLINE_MAX, stdin);
 
@@ -167,6 +197,9 @@ int main(void)
         if (nl)
             *nl = '\0';
 
+        /* clears memory of arg_array buffer */
+        buf_clear(arg_num, arg_array);
+
         /* Parses arguments from string cmd into array of solitary */
         /* strings, each its own argument or token (<, >, |)       */
         arg_num = funct_parse(cmd, arg_array);
@@ -178,31 +211,12 @@ int main(void)
             fprintf(stderr, "Bye...\n");
             break;
         }
-        else if (!strcmp(arg_array[0], "pwd"))
-        {
-            char buffer[CMDLINE_MAX - 3];
+        /* Calls System to execute non-exit command, actual command*/
+        /* identification takes place in our_system function       */
+        retval = our_system(arg_array);
 
-            char* cwd = getcwd(buffer, CMDLINE_MAX - 3);
-            fprintf(stdout, "%s\n", cwd);
-            fprintf(stderr, "+ completed '%s' [0]\n", cmd);
-        }
-        //else if(!strcmp(arg_array[0], "cd"))
-        //{
-        //    dp = opendir(arg_array[1]);
-        //    if (dp == NULL) {
-        //        printf(stderr, "Error: cannot cd into directory");
-        //        break;
-        //    }
-        //}
-        else {
-            /* Calls System to execute non-exit command, actual command*/
-            /* identification takes place in our_system function       */
-            retval = our_system(arg_array);
-
-            /* Returns value from non-exit command */
-            fprintf(stdout, "Return status value for '%s': %d\n",
-                cmd, retval);
-        }
+        /* Returns value from non-exit command */
+        fprintf(stderr, " + completed '%s' [%d]\n", cmd, retval);
     }
     return EXIT_SUCCESS;
 }
