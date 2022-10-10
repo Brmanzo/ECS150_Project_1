@@ -17,6 +17,16 @@ enum {
     TOO_MANY_ARGS
 };
 
+static int file_sel(const struct dirent* DirEntry)
+{
+    if (!strcmp(DirEntry->d_name, ".") || !strcmp(DirEntry->d_name, ".."))
+    {
+        return 0;
+    }
+    else {
+        return 1;
+    }
+}
 void error_handler(int error_code)
 {
     switch (error_code)
@@ -89,7 +99,6 @@ int funct_parse(char* cmd, char** arg_array)
     {
         error_handler(0);
     }
-    arg_num++;
     arg_array[arg_num] = NULL;
     /* Returns number of strings in new array */
     return arg_num;
@@ -111,23 +120,37 @@ int our_system(char** arg_array)
 
             char* cwd = getcwd(buffer, CMDLINE_MAX - 3);
             fprintf(stdout, "%s\n", cwd);
-        }
-        //else if (!strcmp(arg_array[0], "ls"))
-        //{
-        //    DIR* dp;
-        //    struct dirent* ep;
 
-        //    dp = opendir(arg_array[1]);
-        //    if (dp != NULL)
-        //    {
-        //        while (ep = readdir(dp))
-        //            puts(ep->d_name);
-        //        (void)closedir(dp);
-        //    } else {
-        //        printf(stderr, "cannot access '%s': No such file or directory", arg_array[1]);
-        //        break;
-        //    }
-        //}
+            status = 0;
+            return status;
+        }
+        else if (!strcmp(arg_array[0], "ls"))
+        {
+            if (arg_array[1] == NULL)
+            {
+                //DIR* DirStream = opendir("./");
+                struct dirent** DirEntry;
+                int NumDirEntry = 0;
+                NumDirEntry = scandir("./", &DirEntry, file_sel, alphasort);
+
+                if (NumDirEntry >= 0)
+                {
+                    for (int i = 0; i < NumDirEntry; i++)
+                    {
+                        fprintf(stdout, "%s ", DirEntry[i]->d_name);
+                    }
+                    status = 0;
+                    return status;
+                }
+                else
+                {
+                    fprintf(stderr, "ls: cannot access '%s': No such file or directory", arg_array[1]);
+                    status = 2;
+                    return status;
+                }
+                fprintf(stdout, "/n");
+            }
+        }
         //else if(!strcmp(arg_array[0], "cd"))
         //{
         //    dp = opendir(arg_array[1]);
