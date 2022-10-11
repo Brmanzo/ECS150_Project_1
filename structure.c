@@ -101,10 +101,10 @@ usrProcess* organizeProcesses (usrProcess usrProcessArr[], char* inputCmds[], in
 
 int main () {
 
-	char *list[ARG_MAX] = {"echo", "blah", "bing", "bing", "|", "yahoo", "WAH", "<", "dump", "|", "it'same"};
+	char *list[ARG_MAX] = {"echo", "Hello", "world", ">", "file"};
 	usrProcess usrProcessArr[5];
 
-	organizeProcesses(usrProcessArr, list, 11);
+	organizeProcesses(usrProcessArr, list, 5);
 
 	return 0;
 }
