@@ -93,7 +93,7 @@ int funct_parse(char* cmd, char** arg_array)
     return arg_num;
 }
 /* Custom system function to execute the shell command */
-int our_system(char** arg_array, char** dir_stack)
+int our_system(char** arg_array)
 {
     int status = 0;
     pid_t pid;
@@ -102,24 +102,9 @@ int our_system(char** arg_array, char** dir_stack)
     /* Child Path */
     if (pid == 0)
     {
-        /* If user types in pwd, the current filepath is printed to the terminal. */
-        if (!strcmp(arg_array[0], "pwd"))
-        {
-            /* Retrieves current working directory as a string literal*/
-            char buffer[CMDLINE_MAX];
-            char* cwd = getcwd(buffer, CMDLINE_MAX);
-
-            printf("%s\n", cwd);
-
-            _exit(status);
-        }
-
-        }
-        else {
-            /* using execv for array of arguments, -p to access PATH variables */
-            execvp(arg_array[0], arg_array);
-            _exit(EXIT_FAILURE);
-        }
+        /* using execv for array of arguments, -p to access PATH variables */
+        execvp(arg_array[0], arg_array);
+        _exit(EXIT_FAILURE);
     }
     /* The fork failed. Report failure */
     else if (pid < 0)
@@ -146,13 +131,12 @@ void buf_clear(int arg_num, char** arg_array)
 int main(void)
 {
     char* arg_array[ARG_MAX];
-    char* dir_stack[ARG_MAX];
+
+    /* string to hold the working directory (stack) */
+    char stack_buf[CMDLINE_MAX];
+    char* dir_stack = getcwd(stack_buf, CMDLINE_MAX);
     char cmd[CMDLINE_MAX];
     int arg_num = 0;
-
-    char buffer[CMDLINE_MAX];
-    int stack_ptr = 0;
-    dir_stack[stack_ptr] = getcwd(buffer, CMDLINE_MAX);
 
     while (1)
     {
@@ -192,6 +176,17 @@ int main(void)
             fprintf(stderr, "+ completed '%s' [%d]\n", cmd, retval);
             break;
         }
+        /* If user types in pwd, the current filepath is printed to the terminal. */
+        else if (!strcmp(arg_array[0], "pwd"))
+        {
+            /* Retrieves current working directory as a string literal*/
+            char buffer[CMDLINE_MAX];
+            char* cwd = getcwd(buffer, CMDLINE_MAX);
+
+            printf("%s\n", cwd);
+            retval = 0;
+            fprintf(stderr, "+ completed '%s' [%d]\n", cmd, retval);
+        }
         /* If user types in cd the current working directory is changed to */
         /* the directory specified in the second argument.                 */
         else if (!strcmp(arg_array[0], "cd"))
@@ -211,8 +206,7 @@ int main(void)
         {
             int DirEntry = chdir(arg_array[1]);
             if (DirEntry == 0) {
-                stack_ptr++;
-                dir_stack[stack_ptr] = arg_array[1];
+                dir_stack = getcwd(stack_buf, CMDLINE_MAX);
                 retval = 0;
                 fprintf(stderr, "+ completed '%s' [%d]\n", cmd, retval);
             }
@@ -223,14 +217,28 @@ int main(void)
             }
         } 
         else if (!strcmp(arg_array[0], "popd")) {
-
+            if (dir_stack[0] == '0') {
+                retval = 1;
+                fprintf(stderr, "Error: directory stack empty");
+                fprintf(stderr, "+ completed '%s' [%d]\n", cmd, retval);
+            }
+            int i = CMDLINE_MAX;
+            while (dir_stack[i] != '/' && i != 0)
+            {
+                dir_stack[i] = 0;
+                i--;
+            }
+            retval = 0;
+            fprintf(stderr, "+ completed '%s' [%d]\n", cmd, retval);
         }
         else if (!strcmp(arg_array[0], "dirs")) {
-            if (stack_ptr) {
-                
+            if (dir_stack[0] == '0') {
+                fprintf(stderr, "Error: directory stack empty");
             }
             else {
-                fprintf(stderr, "Error: directory stack empty");
+                fprintf(stdout, "%s\n", dir_stack);
+                retval = 0;
+                fprintf(stderr, "+ completed '%s' [%d]\n", cmd, retval);
             }
         }
         else
