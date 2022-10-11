@@ -18,7 +18,8 @@ enum {
     TOO_MANY_ARGS,
     CANT_CD_DIR,
     NO_SUCH_DIR,
-    DIR_STACK_EMPTY
+    DIR_STACK_EMPTY,
+    CMD_NOT_FOUND
 };
 
 /* Function to handle errors, recieves an enum to determine error code. */
@@ -37,6 +38,10 @@ void error_handler(int error_code)
         break;
     case DIR_STACK_EMPTY:
         fprintf(stderr, "Error: directory stack empty\n");
+        break;
+    case CMD_NOT_FOUND:
+        fprintf(stderr, "Error: command not found\n");
+        break;
     }
 }
 /* This function inserts spaces surrounding the redirect characters */
@@ -153,13 +158,26 @@ int built_in_funct(char** arg_array, char* dir_stack, char* pwd_buf, char* stack
     /* If user types in cd the current working directory is changed to */
     /* the directory specified in the second argument (arg_array[1]).  */
     else if (!strcmp(arg_array[0], "cd"))
-    {
-        int DirEntry = chdir(arg_array[1]);
-        if (DirEntry == 0) {
-            return(0);
-        } else {
-            error_handler(CANT_CD_DIR);
-            return(1);
+    {   
+        if (!strcmp(arg_array[1], "dirs")) {
+            int DirEntry = chdir(dir_stack);
+            if (DirEntry == 0) {
+                return(0);
+            }
+            else {
+                error_handler(CANT_CD_DIR);
+                return(1);
+            }
+        }
+        else {
+            int DirEntry = chdir(arg_array[1]);
+            if (DirEntry == 0) {
+                return(0);
+            }
+            else {
+                error_handler(CANT_CD_DIR);
+                return(1);
+            }
         }
     }
     /* If user types in pushd the current working directory is changed to   */
@@ -219,8 +237,8 @@ int main(void)
     /* string to hold the working directory (stack) */
     char pwd_buf[CMDLINE_MAX];
     char stack_buf[CMDLINE_MAX];
-    char* dir_stack = getcwd(stack_buf, CMDLINE_MAX);
     memset(stack_buf, 0, CMDLINE_MAX);
+    char* dir_stack = getcwd(stack_buf, CMDLINE_MAX);
     char cmd[CMDLINE_MAX];
     int arg_num = 0;
 
@@ -275,7 +293,12 @@ int main(void)
             retval = our_system(arg_array);
 
             /* Returns value from non-exit command */
-            fprintf(stderr, "+ completed '%s' [%d]\n", cmd, retval);
+            if (retval !=0) {
+                error_handler(CMD_NOT_FOUND);
+                fprintf(stderr, "+ completed '%s' [1]\n", cmd);
+            } else {
+                fprintf(stderr, "+ completed '%s' [%d]\n", cmd, retval);
+            }
         }
     }
     return EXIT_SUCCESS;
