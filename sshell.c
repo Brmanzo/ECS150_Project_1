@@ -14,7 +14,10 @@
 #define TOK_LEN_MAX 32
 
 enum {
-    TOO_MANY_ARGS
+    TOO_MANY_ARGS,
+    CANT_CD_DIR,
+    NO_SUCH_DIR,
+    DIR_STACK_EMPTY
 };
 
 /* Function to handle errors, recieves an enum to determine error code. */
@@ -25,6 +28,14 @@ void error_handler(int error_code)
     case TOO_MANY_ARGS:
         fprintf(stderr, "Error: too many process arguments\n");
         break;
+    case CANT_CD_DIR:
+        fprintf(stderr, "Error: cannot cd into directory\n");
+        break;
+    case NO_SUCH_DIR:
+        fprintf(stderr, "Error: no such directory\n");
+        break;
+    case DIR_STACK_EMPTY:
+        fprintf(stderr, "Error: directory stack empty\n");
     }
 }
 /* This function inserts spaces surrounding the redirect characters */
@@ -86,7 +97,7 @@ int funct_parse(char* cmd, char** arg_array)
     }
     if (arg_num > ARG_MAX)
     {
-        error_handler(0);
+        error_handler(TOO_MANY_ARGS);
     }
     arg_array[arg_num] = NULL;
     /* Returns number of strings in new array */
@@ -126,6 +137,75 @@ void buf_clear(int arg_num, char** arg_array)
     for (int i = 0; i < arg_num - 1; i++)
     {
         memset(arg_array[i], 0, strlen(arg_array[i]));
+    }
+}
+int built_in_funct(char** arg_array, char* dir_stack)
+{
+    /* If user types in pwd, the current filepath is printed to the terminal. */
+    if (!strcmp(arg_array[0], "pwd"))
+    {
+        /* Retrieves current working directory as a string literal*/
+        char* cwd = getcwd(NULL, CMDLINE_MAX);
+
+        printf("%s\n", cwd);
+        return(0);
+    }
+    /* If user types in cd the current working directory is changed to */
+    /* the directory specified in the second argument.                 */
+    else if (!strcmp(arg_array[0], "cd"))
+    {
+        int DirEntry = chdir(arg_array[1]);
+        if (DirEntry == 0) {
+            return(0);
+        }
+        else {
+            error_handler(CANT_CD_DIR);
+            return(1);
+        }
+    }
+    else if (!strcmp(arg_array[0], "pushd"))
+    {
+        int DirEntry = chdir(arg_array[1]);
+
+        if (DirEntry == 0) {
+            dir_stack = getcwd(NULL, CMDLINE_MAX);
+            return(0);
+        }
+        else {
+            error_handler(NO_SUCH_DIR);
+            return(1);
+        }
+    }
+    else if (!strcmp(arg_array[0], "popd")) {
+        int i = CMDLINE_MAX;
+        int slash_count = 0;
+
+        if (dir_stack[5] == '/')
+        {
+            while (slash_count != 1)
+            {
+                if (dir_stack[i] == '/')
+                    slash_count++;
+                dir_stack[i] = 0;
+                i--;
+            }
+            return(0);
+        }
+        else {
+            error_handler(DIR_STACK_EMPTY);
+            return(1);
+        }
+    }
+    /* Else is dirs */
+    else {
+        if (dir_stack[5] == '/') {
+            fprintf(stdout, "%s\n", dir_stack);
+            return(0);
+        }
+        else {
+            error_handler(DIR_STACK_EMPTY);
+            return(1);
+        }
     }
 }
 int main(void)
@@ -176,78 +256,13 @@ int main(void)
             fprintf(stderr, "+ completed '%s' [%d]\n", cmd, retval);
             break;
         }
-        /* If user types in pwd, the current filepath is printed to the terminal. */
-        else if (!strcmp(arg_array[0], "pwd"))
+        /* If the command string is any of the built-in commands below */
+        /* the built-in function will handle them.                     */
+        if ((!strcmp(arg_array[0], "pwd")) || (!strcmp(arg_array[0], "cd")) || (!strcmp(arg_array[0], "pushd"))
+            || (!strcmp(arg_array[0], "popd")) || (!strcmp(arg_array[0], "dirs")))
         {
-            /* Retrieves current working directory as a string literal*/
-            char buffer[CMDLINE_MAX];
-            char* cwd = getcwd(buffer, CMDLINE_MAX);
-
-            printf("%s\n", cwd);
-            retval = 0;
+            retval = built_in_funct(arg_array, dir_stack);
             fprintf(stderr, "+ completed '%s' [%d]\n", cmd, retval);
-        }
-        /* If user types in cd the current working directory is changed to */
-        /* the directory specified in the second argument.                 */
-        else if (!strcmp(arg_array[0], "cd"))
-        {
-            int DirEntry = chdir(arg_array[1]);
-            if (DirEntry == 0) {
-                retval = 0;
-                fprintf(stderr, "+ completed '%s' [%d]\n", cmd, retval);
-            }
-            else {
-                retval = 1;
-                fprintf(stderr, "Error: cannot cd into directory\n");
-                fprintf(stderr, "+ completed '%s' [%d]\n", cmd, retval);
-            }
-        } 
-        else if (!strcmp(arg_array[0], "pushd"))
-        {
-            int DirEntry = chdir(arg_array[1]);
-            if (DirEntry == 0) {
-                dir_stack = getcwd(stack_buf, CMDLINE_MAX);
-                retval = 0;
-                fprintf(stderr, "+ completed '%s' [%d]\n", cmd, retval);
-            }
-            else {
-                retval = 1;
-                fprintf(stderr, "Error: no such directory\n");
-                fprintf(stderr, "+ completed '%s' [%d]\n", cmd, retval);
-            }
-        } 
-        else if (!strcmp(arg_array[0], "popd")) {
-            int i = CMDLINE_MAX;
-            int slash_count = 0;
-            
-            if (dir_stack[5] == '/')
-            {
-                while (slash_count != 1)
-                {
-                    if (dir_stack[i] == '/') {
-                        slash_count++;
-                    }
-
-                    dir_stack[i] = 0;
-                    i--;
-                }
-                retval = 0;
-                fprintf(stderr, "+ completed '%s' [%d]\n", cmd, retval);
-            } else {
-                    retval = 1;
-                    fprintf(stderr, "Error: directory stack empty\n");
-                    fprintf(stderr, "+ completed '%s' [%d]\n", cmd, retval);
-            }
-        }
-        else if (!strcmp(arg_array[0], "dirs")) {
-            if (dir_stack[0] == '0') {
-                fprintf(stderr, "Error: directory stack empty");
-            }
-            else {
-                fprintf(stdout, "%s\n", dir_stack);
-                retval = 0;
-                fprintf(stderr, "+ completed '%s' [%d]\n", cmd, retval);
-            }
         }
         else
         {
