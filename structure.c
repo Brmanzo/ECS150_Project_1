@@ -17,7 +17,7 @@ typedef struct usrProcess {
     
 	// Separate Name and Args for execv
 	char processName[TOK_LEN_MAX + 1];
-	char* processArgs[ARG_MAX];
+	char *processArgs[ARG_MAX];
 	
 	char filename[TOK_LEN_MAX + 1];
 
@@ -87,10 +87,11 @@ usrProcess* organizeProcesses (usrProcess usrProcessArr[], char* inputCmds[], in
 			printf("Name: %s\n", usrProcessArr[p].processName);
 			fflush(stdout);
 		} else {
-			usrProcessArr[p].processArgs[argCount] = inputCmds[i];
+			usrProcessArr[p].processArgs[argCount] = malloc(sizeof(char) * strlen(inputCmds[i]));
+			strcpy(usrProcessArr[p].processArgs[argCount], inputCmds[i]);
 			argCount++;
 
-			printf("Arg %d: %s\n", argCount, usrProcessArr[p].processArgs[argCount]);
+			printf("Arg %d: %s\n", argCount - 1, usrProcessArr[p].processArgs[argCount - 1]);
 			fflush(stdout);
 		}
 	}
