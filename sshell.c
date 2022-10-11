@@ -198,7 +198,7 @@ int main(void)
             }
             else {
                 retval = 1;
-                fprintf(stderr, "Error: cannot cd into directory");
+                fprintf(stderr, "Error: cannot cd into directory\n");
                 fprintf(stderr, "+ completed '%s' [%d]\n", cmd, retval);
             }
         } 
@@ -212,24 +212,32 @@ int main(void)
             }
             else {
                 retval = 1;
-                fprintf(stderr, "Error: no such directory");
+                fprintf(stderr, "Error: no such directory\n");
                 fprintf(stderr, "+ completed '%s' [%d]\n", cmd, retval);
             }
         } 
         else if (!strcmp(arg_array[0], "popd")) {
-            if (dir_stack[0] == '0') {
-                retval = 1;
-                fprintf(stderr, "Error: directory stack empty");
-                fprintf(stderr, "+ completed '%s' [%d]\n", cmd, retval);
-            }
             int i = CMDLINE_MAX;
-            while (dir_stack[i] != '/' && i != 0)
+            int slash_count = 0;
+            
+            if (dir_stack[5] == '/')
             {
-                dir_stack[i] = 0;
-                i--;
+                while (slash_count != 1)
+                {
+                    if (dir_stack[i] == '/') {
+                        slash_count++;
+                    }
+
+                    dir_stack[i] = 0;
+                    i--;
+                }
+                retval = 0;
+                fprintf(stderr, "+ completed '%s' [%d]\n", cmd, retval);
+            } else {
+                    retval = 1;
+                    fprintf(stderr, "Error: directory stack empty\n");
+                    fprintf(stderr, "+ completed '%s' [%d]\n", cmd, retval);
             }
-            retval = 0;
-            fprintf(stderr, "+ completed '%s' [%d]\n", cmd, retval);
         }
         else if (!strcmp(arg_array[0], "dirs")) {
             if (dir_stack[0] == '0') {
