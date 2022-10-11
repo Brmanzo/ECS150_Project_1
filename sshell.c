@@ -16,42 +16,6 @@
 enum {
     TOO_MANY_ARGS
 };
-/* File Selector to be used within Directory Selector function used in ls*/
-/* implementation. Passed as a parameter to scandir().                   */
-static int file_sel(const struct dirent* DirEntry)
-{
-    /* Filters out directory entries that represent the directory */
-    /* hierarchy. Returning 1 lists the file, 0 ignores the file. */
-    if (!strcmp(DirEntry->d_name, ".") || !strcmp(DirEntry->d_name, ".."))
-    {
-        return 0;
-    }
-    else {
-        return 1;
-    }
-}
-
-/* Directory Selector scans the contents of the provided file name */
-/* and prints the contents to the terminal in alphabetical order.  */
-void dir_sel(char* FileName, char** arg_array) {
-    /* Initializing Directory type object and number of entries in directory. */
-    struct dirent** DirEntry;
-    int NumDirEntry = 0;
-    NumDirEntry = scandir(FileName, &DirEntry, file_sel, alphasort);
-
-    /* Retrieves DirEntry Array via reference and iterates through it */
-    /* Printing selected files to the terminal in alphabetical order. */
-    if (NumDirEntry >= 0)
-    {
-        for (int i = 0; i < NumDirEntry; i++)
-        {
-            fprintf(stdout, "%s ", DirEntry[i]->d_name);
-        }
-    } else {
-        fprintf(stderr, "ls: cannot access '%s': No such file or directory", arg_array[1]);
-    }
-    fprintf(stdout, "\n");
-}
 
 /* Function to handle errors, recieves an enum to determine error code. */
 void error_handler(int error_code)
@@ -63,7 +27,6 @@ void error_handler(int error_code)
         break;
     }
 }
-
 /* This function inserts spaces surrounding the redirect characters */
 /* in order to account for the edge case where there is no space    */
 char* redir_space(char* cmd)
@@ -101,7 +64,6 @@ char* redir_space(char* cmd)
     }
     return strdup(buf_cmd);
 }
-
 /* This function splits the input cmd string into an array of strings */
 /* by treating spaces as tokens                                       */
 int funct_parse(char* cmd, char** arg_array)
@@ -130,9 +92,8 @@ int funct_parse(char* cmd, char** arg_array)
     /* Returns number of strings in new array */
     return arg_num;
 }
-
 /* Custom system function to execute the shell command */
-int our_system(char** arg_array, int arg_num)
+int our_system(char** arg_array, char** dir_stack)
 {
     int status = 0;
     pid_t pid;
@@ -145,39 +106,14 @@ int our_system(char** arg_array, int arg_num)
         if (!strcmp(arg_array[0], "pwd"))
         {
             /* Retrieves current working directory as a string literal*/
-            char buffer[CMDLINE_MAX - 3];
-            char* cwd = getcwd(buffer, CMDLINE_MAX - 3);
+            char buffer[CMDLINE_MAX];
+            char* cwd = getcwd(buffer, CMDLINE_MAX);
 
-            fprintf(stdout, "%s\n", cwd);
+            printf("%s\n", cwd);
 
             _exit(status);
         }
-        /* If user types in ls, the contents of the filepath are printed. */
-        else if (!strcmp(arg_array[0], "ls"))
-        {
-            /* If ls has no arguments, the contents of the cwd are printed. */
-            if (arg_num == 1) {
-                dir_sel("./", arg_array);
-                _exit(status);
-            /* Otherwise, the contents of the specified filepath are printed. */
-            } else {
-                dir_sel(arg_array[1], arg_array);
-                _exit(status);
-            }
-        }
-        /* If user types in cd the current working directory is changed to */
-        /* the directory specified in the second argument.                 */
-        else if(!strcmp(arg_array[0], "cd"))
-        {
-            int DirEntry = chdir(arg_array[1]);
-            if (DirEntry == 0) {
-                return(status);
-            } else {
-                fprintf(stderr, "Error: cannot cd into directory");
-                status = 2;
-                return(status);
 
-            }
         }
         else {
             /* using execv for array of arguments, -p to access PATH variables */
@@ -199,7 +135,6 @@ int our_system(char** arg_array, int arg_num)
     }
     return status;
 }
-
 /* function to clear the array of strings buffer */
 void buf_clear(int arg_num, char** arg_array)
 {
@@ -208,19 +143,21 @@ void buf_clear(int arg_num, char** arg_array)
         memset(arg_array[i], 0, strlen(arg_array[i]));
     }
 }
-
 int main(void)
 {
     char* arg_array[ARG_MAX];
+    char* dir_stack[ARG_MAX];
     char cmd[CMDLINE_MAX];
     int arg_num = 0;
 
-    //DIR* dp;
+    char buffer[CMDLINE_MAX];
+    int stack_ptr = 0;
+    dir_stack[stack_ptr] = getcwd(buffer, CMDLINE_MAX);
 
     while (1)
     {
         char* nl;
-        int retval;
+        int retval = 0;
 
         /* Print prompt */
         printf("sshell$ ");
@@ -252,14 +189,59 @@ int main(void)
         if (!strcmp(arg_array[0], "exit"))
         {
             fprintf(stderr, "Bye...\n");
+            fprintf(stderr, "+ completed '%s' [%d]\n", cmd, retval);
             break;
         }
-        /* Calls System to execute non-exit command, actual command*/
-        /* identification takes place in our_system function       */
-        retval = our_system(arg_array, arg_num);
+        /* If user types in cd the current working directory is changed to */
+        /* the directory specified in the second argument.                 */
+        else if (!strcmp(arg_array[0], "cd"))
+        {
+            int DirEntry = chdir(arg_array[1]);
+            if (DirEntry == 0) {
+                retval = 0;
+                fprintf(stderr, "+ completed '%s' [%d]\n", cmd, retval);
+            }
+            else {
+                retval = 1;
+                fprintf(stderr, "Error: cannot cd into directory");
+                fprintf(stderr, "+ completed '%s' [%d]\n", cmd, retval);
+            }
+        } 
+        else if (!strcmp(arg_array[0], "pushd"))
+        {
+            int DirEntry = chdir(arg_array[1]);
+            if (DirEntry == 0) {
+                stack_ptr++;
+                dir_stack[stack_ptr] = arg_array[1];
+                retval = 0;
+                fprintf(stderr, "+ completed '%s' [%d]\n", cmd, retval);
+            }
+            else {
+                retval = 1;
+                fprintf(stderr, "Error: no such directory");
+                fprintf(stderr, "+ completed '%s' [%d]\n", cmd, retval);
+            }
+        } 
+        else if (!strcmp(arg_array[0], "popd")) {
 
-        /* Returns value from non-exit command */
-        fprintf(stderr, " + completed '%s' [%d]\n", cmd, retval);
+        }
+        else if (!strcmp(arg_array[0], "dirs")) {
+            if (stack_ptr) {
+                
+            }
+            else {
+                fprintf(stderr, "Error: directory stack empty");
+            }
+        }
+        else
+        {
+            /* Calls System to execute non-exit command, actual command*/
+            /* identification takes place in our_system function       */
+            retval = our_system(arg_array);
+
+            /* Returns value from non-exit command */
+            fprintf(stderr, "+ completed '%s' [%d]\n", cmd, retval);
+        }
     }
     return EXIT_SUCCESS;
 }
