@@ -13,6 +13,7 @@
 #define ARG_MAX 16
 #define TOK_LEN_MAX 32
 
+/* Enums to pass when handling errors. */
 enum {
     TOO_MANY_ARGS,
     CANT_CD_DIR,
@@ -67,8 +68,7 @@ char* redir_space(char* cmd)
             buf_cmd[j] = ' ';
             j++;
             /* Otherwise it simply buffers the character into the new array */
-        }
-        else {
+        } else {
             buf_cmd[j] = cmd[i];
             j++;
         }
@@ -121,8 +121,7 @@ int our_system(char** arg_array)
     else if (pid < 0)
     {
         status = -1;
-    }
-    else {
+    } else {
         /*This is the parent process. Wait for the child to complete */
         if (waitpid(pid, &status, 0) != pid)
         {
@@ -139,36 +138,40 @@ void buf_clear(int arg_num, char** arg_array)
         memset(arg_array[i], 0, strlen(arg_array[i]));
     }
 }
-int built_in_funct(char** arg_array, char* dir_stack)
+int built_in_funct(char** arg_array, char* dir_stack, char* pwd_buf, char* stack_buf)
 {
     /* If user types in pwd, the current filepath is printed to the terminal. */
     if (!strcmp(arg_array[0], "pwd"))
     {
         /* Retrieves current working directory as a string literal*/
-        char* cwd = getcwd(NULL, CMDLINE_MAX);
+        memset(pwd_buf, 0, CMDLINE_MAX);
+        char* cwd = getcwd(pwd_buf, CMDLINE_MAX);
 
         printf("%s\n", cwd);
         return(0);
     }
     /* If user types in cd the current working directory is changed to */
-    /* the directory specified in the second argument.                 */
+    /* the directory specified in the second argument (arg_array[1]).  */
     else if (!strcmp(arg_array[0], "cd"))
     {
         int DirEntry = chdir(arg_array[1]);
         if (DirEntry == 0) {
             return(0);
-        }
-        else {
+        } else {
             error_handler(CANT_CD_DIR);
             return(1);
         }
     }
+    /* If user types in pushd the current working directory is changed to   */
+    /* the directory specified in the second argument and the new directory */
+    /* is added to the directory stack.                                     */
     else if (!strcmp(arg_array[0], "pushd"))
     {
         int DirEntry = chdir(arg_array[1]);
 
         if (DirEntry == 0) {
-            dir_stack = getcwd(NULL, CMDLINE_MAX);
+            memset(stack_buf, 0, CMDLINE_MAX);
+            dir_stack = getcwd(stack_buf, CMDLINE_MAX);
             return(0);
         }
         else {
@@ -176,6 +179,8 @@ int built_in_funct(char** arg_array, char* dir_stack)
             return(1);
         }
     }
+    /* If the user types in popd, the most recent directory is popped from */
+    /* the directory stack aka truncating the string up until the next '/'.*/
     else if (!strcmp(arg_array[0], "popd")) {
         int i = CMDLINE_MAX;
         int slash_count = 0;
@@ -190,19 +195,18 @@ int built_in_funct(char** arg_array, char* dir_stack)
                 i--;
             }
             return(0);
-        }
-        else {
+        } else {
             error_handler(DIR_STACK_EMPTY);
             return(1);
         }
     }
-    /* Else is dirs */
+    /* Otherwise, the fifth condition will be that the user typed in dirs */
+    /* and prints the current state of the directory stack string.        */
     else {
         if (dir_stack[5] == '/') {
             fprintf(stdout, "%s\n", dir_stack);
             return(0);
-        }
-        else {
+        } else {
             error_handler(DIR_STACK_EMPTY);
             return(1);
         }
@@ -213,8 +217,10 @@ int main(void)
     char* arg_array[ARG_MAX];
 
     /* string to hold the working directory (stack) */
+    char pwd_buf[CMDLINE_MAX];
     char stack_buf[CMDLINE_MAX];
     char* dir_stack = getcwd(stack_buf, CMDLINE_MAX);
+    memset(stack_buf, 0, CMDLINE_MAX);
     char cmd[CMDLINE_MAX];
     int arg_num = 0;
 
@@ -261,11 +267,9 @@ int main(void)
         if ((!strcmp(arg_array[0], "pwd")) || (!strcmp(arg_array[0], "cd")) || (!strcmp(arg_array[0], "pushd"))
             || (!strcmp(arg_array[0], "popd")) || (!strcmp(arg_array[0], "dirs")))
         {
-            retval = built_in_funct(arg_array, dir_stack);
+            retval = built_in_funct(arg_array, dir_stack, pwd_buf, stack_buf);
             fprintf(stderr, "+ completed '%s' [%d]\n", cmd, retval);
-        }
-        else
-        {
+        } else {
             /* Calls System to execute non-exit command, actual command*/
             /* identification takes place in our_system function       */
             retval = our_system(arg_array);
