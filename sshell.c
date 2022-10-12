@@ -10,7 +10,6 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-
 #define CMDLINE_MAX 512
 #define USR_ARG_MAX 16
 #define TOK_LEN_MAX 32
@@ -28,19 +27,20 @@ typedef struct org_cmd {
   bool redirIn;
   bool redirOut;
 
-  // To be initialized after 
+  // To be initialized after
   int fdIn;
   int fdOut;
 }org_cmd;
 
-// Make sure to declare array of struct outside of this scope and pass by reference
-org_cmd* organizeProcesses(org_cmd usrProcessArr[], char* inputCmds[], int numCmds)
+// Declare array of struct outside of this scope and pass by reference
+org_cmd* organizeProcesses(org_cmd usrProcessArr[],
+  char* inputCmds[], int numCmds)
 { // numCmds includes | and <> symbols
   int p = 0; // iterator for process in usrProcessArr
   bool firstArg = true; // toggle within for loop
   int argCount = 0; // iterator for struct argument array parameter
 
-    //initialize struct
+  //initialize struct
   for (int j = 0; j < 5; j++)
   {
     usrProcessArr[j].pipeIn = false;
@@ -48,7 +48,6 @@ org_cmd* organizeProcesses(org_cmd usrProcessArr[], char* inputCmds[], int numCm
     usrProcessArr[j].redirIn = false;
     usrProcessArr[j].redirOut = false;
   }
-
   for (int i = 0; i < numCmds; i++) {
     if (!strncmp(inputCmds[i], "|", 1))
     {
@@ -65,7 +64,7 @@ org_cmd* organizeProcesses(org_cmd usrProcessArr[], char* inputCmds[], int numCm
       strcpy(usrProcessArr[p].filename, inputCmds[i + 1]);
       i++;
       firstArg = false;
-      argCount = 0; //??
+      argCount = 0;
 
       printf("Input: %s\n", usrProcessArr[p].filename);
       fflush(stdout);
@@ -90,11 +89,13 @@ org_cmd* organizeProcesses(org_cmd usrProcessArr[], char* inputCmds[], int numCm
       printf("Name: %s\n", usrProcessArr[p].processName);
       fflush(stdout);
     } else {
-      usrProcessArr[p].processArgs[argCount] = malloc(sizeof(char) * strlen(inputCmds[i]));
+      usrProcessArr[p].processArgs[argCount] = malloc(sizeof(char)
+        * strlen(inputCmds[i]));
       strcpy(usrProcessArr[p].processArgs[argCount], inputCmds[i]);
       argCount++;
 
-      printf("Arg %d: %s\n", argCount - 1, usrProcessArr[p].processArgs[argCount - 1]);
+      printf("Arg %d: %s\n", argCount - 1, 
+        usrProcessArr[p].processArgs[argCount - 1]);
       fflush(stdout);
       }
   }
@@ -108,7 +109,6 @@ enum {
   DIR_STACK_EMPTY,
   CMD_NOT_FOUND
 };
-
 /* Function to handle errors, recieves an enum to determine error code. */
 void error_handler(int error_code)
 {
@@ -165,13 +165,14 @@ char* redir_space(char* cmd, int* pipe_num)
       j++;
       buf_cmd[j] = ' ';
       j++;
-      /* Otherwise it simply buffers the character into the new array */
     }
+    /* If the character is a pipe, it increments pipe_num for our piping. */
     else if (cmd[i] == '|')
     {
       (*pipe_num)++;
       buf_cmd[j] = cmd[i];
       j++;
+    /* Otherwise it simply buffers the character into the new array */
     } else {
       buf_cmd[j] = cmd[i];
       j++;
@@ -179,8 +180,8 @@ char* redir_space(char* cmd, int* pipe_num)
   }
   return strdup(buf_cmd);
 }
-/* This function splits the input cmd string into an array of strings */
-/* by treating spaces as tokens                                       */
+/* This function splits the input cmd string into an */
+/* array of strings by treating spaces as tokens.    */
 int funct_parse(char* cmd, char** arg_array, int* pipe_num)
 {
   /* Inserts spaces surrounding redirection characters */
@@ -189,8 +190,8 @@ int funct_parse(char* cmd, char** arg_array, int* pipe_num)
 
   char* cmd_arg = strtok(buf_arr, " \n");
 
-  /* Splits cmd string into an array of strings according */
-  /* to the position of interleaven spaces                */
+  /* Splits cmd string into an array of strings on every space. */
+  /* The redundant space inserts by redir_space are ignored.    */
   while (cmd_arg != NULL)
   {
     arg_array[arg_num] = cmd_arg;
@@ -204,7 +205,8 @@ int funct_parse(char* cmd, char** arg_array, int* pipe_num)
   /* Returns number of strings in new array */
   return arg_num;
 }
-int built_in_funct(char** arg_array, char** dir_stack, char* pwd_buf, char* stack_buf, int* dir_num)
+int built_in_funct(char** arg_array, char** dir_stack, char* pwd_buf,
+  char* stack_buf, int* dir_num)
 {
   /* If user types in pwd, the current filepath is printed to the terminal. */
   if (!strcmp(arg_array[0], "pwd"))
@@ -322,7 +324,7 @@ int main(void)
   int pipe_num = 0;
   int dir_num = 0;
   dir_stack[dir_num] = malloc(sizeof(char) * CMDLINE_MAX);
-  
+ 
   getcwd(stack_buf, CMDLINE_MAX);
   strcpy(dir_stack[0], stack_buf);
   dir_num++;
@@ -370,10 +372,12 @@ int main(void)
     }
     /* If the command string is any of the built-in commands below */
     /* the built-in function will handle them.                     */
-    if ((!strcmp(arg_array[0], "pwd")) || (!strcmp(arg_array[0], "cd")) || (!strcmp(arg_array[0], "pushd"))
-      || (!strcmp(arg_array[0], "popd")) || (!strcmp(arg_array[0], "dirs")))
+    if ((!strcmp(arg_array[0], "pwd")) || (!strcmp(arg_array[0], "cd")) 
+      || (!strcmp(arg_array[0], "pushd")) || (!strcmp(arg_array[0], "popd")) 
+        || (!strcmp(arg_array[0], "dirs")))
     {
-      retval = built_in_funct(arg_array, dir_stack, pwd_buf, stack_buf, &dir_num);
+      retval = built_in_funct(arg_array, dir_stack, pwd_buf,
+          stack_buf, &dir_num);
       fprintf(stderr, "+ completed '%s' [%d]\n", cmd, retval);
     } else {
       /* Calls System to execute non-exit command, actual command*/
