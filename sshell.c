@@ -388,7 +388,7 @@ int main(void)
       if (retval != 0)
       {
         error_handler(CMD_NOT_FOUND);
-        fprintf(stderr, "+ completed '%s' [%d]\n", cmd, retval);
+        fprintf(stderr, "+ completed '%s' [1]\n", cmd);
       } else {
         fprintf(stderr, "+ completed '%s' [%d]\n", cmd, retval);
       }
