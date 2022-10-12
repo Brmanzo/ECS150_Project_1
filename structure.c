@@ -102,7 +102,7 @@ usrProcess* organizeProcesses (usrProcess usrProcessArr[], char* inputCmds[], in
 int main () {
 
 	char *list[ARG_MAX] = {"echo", "Hello", "world", ">", "file"};
-	usrProcess usrProcessArr[5];
+	usrProcess usrProcessArr[5]; //index size "num Pipes"
 
 	organizeProcesses(usrProcessArr, list, 5);
 
