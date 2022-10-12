@@ -1,18 +1,107 @@
 #ifndef SSHELL_C_
 #define SSHELL_C_
 
+#include <dirent.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-#include <dirent.h>
+#include <unistd.h>
+
 
 #define CMDLINE_MAX 512
 #define USR_ARG_MAX 16
 #define TOK_LEN_MAX 32
 
+typedef struct org_cmd{
+
+    // Separate Name and Args for execv
+    char processName[TOK_LEN_MAX + 1];
+    char* processArgs[USR_ARG_MAX];
+
+    char filename[TOK_LEN_MAX + 1];
+
+    // To allow / deny usage of fdIn and fdOut variables
+    // Possible that we only need one set, to remove if needed later
+    bool pipeIn;
+    bool pipeOut;
+    bool redirIn;
+    bool redirOut;
+
+    // To be initialized after 
+    int fdIn;
+    int fdOut;
+}org_cmd;
+
+// Make sure to declare array of struct outside of this scope and pass by reference
+org_cmd* organizeProcesses(org_cmd usrProcessArr[], char* inputCmds[], int numCmds)
+{ // numCmds includes | and <> symbols
+
+    int p = 0; // iterator for process in usrProcessArr
+    bool firstArg = true; // toggle within for loop
+    int argCount = 0; // iterator for struct argument array parameter
+
+    //initialize struct
+    for (int j = 0; j < 5; j++) {
+        usrProcessArr[j].pipeIn = false;
+        usrProcessArr[j].pipeOut = false;
+        usrProcessArr[j].redirIn = false;
+        usrProcessArr[j].redirOut = false;
+    }
+
+    for (int i = 0; i < numCmds; i++) {
+        if (!strncmp(inputCmds[i], "|", 1)) 
+        {
+            usrProcessArr[p].pipeOut = true;
+            usrProcessArr[++p].pipeIn = true;
+            firstArg = true;
+
+            printf("Pipe\n");
+            fflush(stdout);
+            continue;
+        }
+        if (!strncmp(inputCmds[i], "<", 1)) { //input redir, program < file
+            usrProcessArr[p].redirIn = true;
+            strcpy(usrProcessArr[p].filename, inputCmds[i + 1]);
+            i++;
+            firstArg = false;
+            argCount = 0; //??
+
+            printf("Input: %s\n", usrProcessArr[p].filename);
+            fflush(stdout);
+            continue;
+        }
+        if (!strncmp(inputCmds[i], ">", 1)) {
+            usrProcessArr[p].redirOut = true;
+            strcpy(usrProcessArr[p].filename, inputCmds[i + 1]);
+            i++;
+            firstArg = false;
+
+            printf("Output: %s\n", usrProcessArr[p].filename);
+            fflush(stdout);
+            continue;
+        }
+        if (firstArg) {
+            strcpy(usrProcessArr[p].processName, inputCmds[i]);
+            firstArg = false;
+            argCount = 0;
+
+            printf("Name: %s\n", usrProcessArr[p].processName);
+            fflush(stdout);
+        }
+        else {
+            usrProcessArr[p].processArgs[argCount] = malloc(sizeof(char) * strlen(inputCmds[i]));
+            strcpy(usrProcessArr[p].processArgs[argCount], inputCmds[i]);
+            argCount++;
+
+            printf("Arg %d: %s\n", argCount - 1, usrProcessArr[p].processArgs[argCount - 1]);
+            fflush(stdout);
+        }
+    }
+    return usrProcessArr;
+}
 /* Enums to pass when handling errors. */
 enum {
     TOO_MANY_ARGS,
@@ -109,34 +198,6 @@ int funct_parse(char* cmd, char** arg_array)
     /* Returns number of strings in new array */
     return arg_num;
 }
-/* Custom system function to execute the shell command */
-int our_system(char** arg_array)
-{
-    int status = 0;
-    pid_t pid;
-
-    pid = fork();
-    /* Child Path */
-    if (pid == 0)
-    {
-        /* using execv for array of arguments, -p to access PATH variables */
-        execvp(arg_array[0], arg_array);
-        _exit(1);
-    }
-    /* The fork failed. Report failure */
-    else if (pid < 0)
-    {
-        status = -1;
-    }
-    else {
-        /*This is the parent process. Wait for the child to complete */
-        if (waitpid(pid, &status, 0) != pid)
-        {
-            status = -1;
-        }
-    }
-    return status;
-}
 /* function to clear the array of strings buffer */
 void buf_clear(int arg_num, char** arg_array)
 {
@@ -179,30 +240,13 @@ int built_in_funct(char** arg_array, char** dir_stack, char* pwd_buf, char* stac
 
         if (DirEntry == 0) 
         {
-            printf("Dir_num :%d\n", *dir_num);
-            printf("Dir_num :%d\n", *dir_num);
             int i = *dir_num;
-	    dir_stack[i] = malloc(sizeof(char) * CMDLINE_MAX);
-	    getcwd(stack_buf, CMDLINE_MAX);
+	        dir_stack[i] = malloc(sizeof(char) * CMDLINE_MAX);
+	        getcwd(stack_buf, CMDLINE_MAX);
             strcpy(dir_stack[i], stack_buf);
             (*dir_num)++;
-            //memset(stack_buf, 0, CMDLINE_MAX);
-
-
-		printf("TEST\n");
-		for (int k = 0; k < *dir_num; k++) {
-			printf("num: %d\n", k);
-			printf("stack: %s\n", dir_stack[k]);
-			fflush(stdout);
-		}
-
-
-
-
-
             return(0);
-        }
-        else {
+        } else {
             error_handler(NO_SUCH_DIR);
             return(1);
         }
@@ -213,10 +257,12 @@ int built_in_funct(char** arg_array, char** dir_stack, char* pwd_buf, char* stac
     {
         if (*dir_num > 0)
         {
-            printf("Dir_num: %d\n", *dir_num);
-            (*dir_num)--;
-            printf("Dir_num: %d\n", *dir_num);
-            return(0);
+            (*dir_num)-=2;
+            int i = *dir_num;
+            fprintf(stderr, "stack being changed to when popped: %s\n", dir_stack[i]);
+            int DirEntry = chdir(dir_stack[i]);
+            (*dir_num)++;
+            return(DirEntry);
         }
         else {
             error_handler(DIR_STACK_EMPTY);
@@ -229,7 +275,6 @@ int built_in_funct(char** arg_array, char** dir_stack, char* pwd_buf, char* stac
     {
     	int dir_num_cpy = *dir_num - 1;
         if (dir_num_cpy >= 0) {
-            printf("Dir_num: %d\n", dir_num_cpy);
             int j = dir_num_cpy;
             for (int i = j; i > -1; i--)
             {
@@ -242,6 +287,34 @@ int built_in_funct(char** arg_array, char** dir_stack, char* pwd_buf, char* stac
             return(1);
         }
     }
+}
+/* Custom system function to execute the shell command */
+int our_system(char** arg_array)
+{
+    int status = 0;
+    pid_t pid;
+
+    pid = fork();
+    /* Child Path */
+    if (pid == 0)
+    {
+        /* using execv for array of arguments, -p to access PATH variables */
+        execvp(arg_array[0], arg_array);
+        _exit(1);
+    }
+    /* The fork failed. Report failure */
+    else if (pid < 0)
+    {
+        status = -1;
+    }
+    else {
+        /*This is the parent process. Wait for the child to complete */
+        if (waitpid(pid, &status, 0) != pid)
+        {
+            status = -1;
+        }
+    }
+    return status;
 }
 int main(void)
 {
