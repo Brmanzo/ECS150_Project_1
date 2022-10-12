@@ -107,7 +107,13 @@ enum {
   CANT_CD_DIR,
   NO_SUCH_DIR,
   DIR_STACK_EMPTY,
-  CMD_NOT_FOUND
+  CMD_NOT_FOUND,
+  MISSING_CMD,
+  NO_OUTPUT_F,
+  CANT_OPEN_OUT_F,
+  MISLOC_OUT_DIR,
+  NO_INPUT_F,
+  MISLOC_IN_DIR
 };
 /* Function to handle errors, recieves an enum to determine error code. */
 void error_handler(int error_code)
@@ -129,6 +135,21 @@ void error_handler(int error_code)
   case CMD_NOT_FOUND:
     fprintf(stderr, "Error: command not found\n");
     break;
+  case MISSING_CMD:
+    fprintf(stderr, "Error: missing command\n");
+    break;
+  case NO_OUTPUT_F:
+    fprintf(stderr, "Error: no output file\n");
+    break;
+  case CANT_OPEN_OUT_F:
+    fprintf(stderr, "Error: cannot open output file\n");
+    break;
+  case MISLOC_OUT_DIR:
+    fprintf(stderr, "Error: mislocated output redirection\n");
+    break;
+  case NO_INPUT_F:
+    fprintf(stderr, "Error: no input file\n");
+    break;
   }
 }
 /* function to clear the array of strings buffer */
@@ -139,7 +160,7 @@ void buf_clear(int arg_num, char** arg_array)
 }
 /* This function inserts spaces surrounding the redirect characters */
 /* in order to account for the edge case where there is no space    */
-char* redir_space(char* cmd, int* pipe_num)
+char* redir_space(char* cmd, int* pipe_num, int* redir_num)
 {
   char buf_cmd[CMDLINE_MAX + 1];
   memset(buf_cmd, 0, sizeof(buf_cmd));
@@ -159,6 +180,7 @@ char* redir_space(char* cmd, int* pipe_num)
     }
     else if (cmd[i] == '>')
     {
+      (*redir_num)++;
       buf_cmd[j] = ' ';
       j++;
       buf_cmd[j] = '>';
@@ -182,10 +204,10 @@ char* redir_space(char* cmd, int* pipe_num)
 }
 /* This function splits the input cmd string into an */
 /* array of strings by treating spaces as tokens.    */
-int funct_parse(char* cmd, char** arg_array, int* pipe_num)
+int funct_parse(char* cmd, char** arg_array, int* pipe_num, int* redir_num)
 {
   /* Inserts spaces surrounding redirection characters */
-  char* buf_arr = redir_space(cmd, pipe_num);
+  char* buf_arr = redir_space(cmd, pipe_num, redir_num);
   int arg_num = 0;
 
   char* cmd_arg = strtok(buf_arr, " \n");
@@ -202,6 +224,15 @@ int funct_parse(char* cmd, char** arg_array, int* pipe_num)
   if (arg_num > USR_ARG_MAX)
     error_handler(TOO_MANY_ARGS);
   arg_array[arg_num] = NULL;
+
+  if ((!strcmp(arg_array[0], ">")) || (!strcmp(arg_array[0], "|")) || (!strcmp(arg_array[arg_num], "|")))
+    error_handler(MISSING_CMD);
+  if ((!strcmp(arg_array[arg_num], ">")))
+    error_handler(NO_OUTPUT_F);
+  if ((redir_num != 0) && (strcmp(arg_array[arg_num - 1], ">")))
+      error_handler(MISLOC_OUT_DIR);
+  if ((strcmp(arg_array[arg_num], "<")))
+      error_handler(NO_INPUT_F);
   /* Returns number of strings in new array */
   return arg_num;
 }
@@ -288,7 +319,7 @@ int built_in_funct(char** arg_array, char** dir_stack, char* pwd_buf,
   }
 }
 /* Custom system function to execute the shell command. */
-int our_system(char** arg_array)
+int our_system(char** arg_array, org_cmd* org_cmd_array, int* redir_num, int* pipe_num)
 {
   int status = 0;
   pid_t pid;
@@ -297,6 +328,13 @@ int our_system(char** arg_array)
   /* Child Path */
   if (pid == 0)
   {
+    if ((redir_num == 0) && (pipe_num == 0)) {
+      /* using execv for array of arguments, -p to access PATH variables. */
+      execvp(arg_array[0], arg_array);
+      _exit(1);
+    } else {
+      //Add Here
+    }
     /* using execv for array of arguments, -p to access PATH variables. */
     execvp(arg_array[0], arg_array);
     _exit(1);
@@ -305,8 +343,8 @@ int our_system(char** arg_array)
   else if (pid < 0)
   {
     status = -1;
-  } else {
     /*This is the parent process. Wait for the child to complete. */
+  } else {
     if (waitpid(pid, &status, 0) != pid)
       status = -1;
   }
@@ -322,6 +360,7 @@ int main(void)
   char* dir_stack[USR_ARG_MAX];
   
   int pipe_num = 0;
+  int redir_num = 0;
   int dir_num = 0;
   dir_stack[dir_num] = malloc(sizeof(char) * CMDLINE_MAX);
  
@@ -360,7 +399,7 @@ int main(void)
 
     /* Parses arguments from string cmd into array of solitary */
     /* strings, each its own argument or token (<, >, |)       */
-    arg_num = funct_parse(cmd, arg_array, &pipe_num);
+    arg_num = funct_parse(cmd, arg_array, &pipe_num, &redir_num);
 
     /* Exit must be within main in order to break from program */
     /* instead of breaking from a fork                         */
@@ -380,9 +419,12 @@ int main(void)
           stack_buf, &dir_num);
       fprintf(stderr, "+ completed '%s' [%d]\n", cmd, retval);
     } else {
+      org_cmd org_cmd_array[pipe_num + 1];
+      organizeProcesses(org_cmd_array, arg_array, arg_num);
+      
       /* Calls System to execute non-exit command, actual command*/
       /* identification takes place in our_system function       */
-      retval = our_system(arg_array);
+      retval = our_system(arg_array, org_cmd_array, &redir_num, &pipe_num);
 
       /* Returns value from non-exit command */
       if (retval != 0)
