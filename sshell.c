@@ -10,7 +10,7 @@
 #include <dirent.h>
 
 #define CMDLINE_MAX 512
-#define ARG_MAX 16
+#define USR_ARG_MAX 16
 #define TOK_LEN_MAX 32
 
 /* Enums to pass when handling errors. */
@@ -101,7 +101,7 @@ int funct_parse(char* cmd, char** arg_array)
         arg_num++;
         cmd_arg = strtok(NULL, " ");
     }
-    if (arg_num > ARG_MAX)
+    if (arg_num > USR_ARG_MAX)
     {
         error_handler(TOO_MANY_ARGS);
     }
@@ -180,11 +180,26 @@ int built_in_funct(char** arg_array, char** dir_stack, char* pwd_buf, char* stac
         if (DirEntry == 0) 
         {
             printf("Dir_num :%d\n", *dir_num);
-            (*dir_num)++;
             printf("Dir_num :%d\n", *dir_num);
             int i = *dir_num;
-            dir_stack[i] = getcwd(stack_buf, CMDLINE_MAX);
+	    dir_stack[i] = malloc(sizeof(char) * CMDLINE_MAX);
+	    getcwd(stack_buf, CMDLINE_MAX);
+            strcpy(dir_stack[i], stack_buf);
+            (*dir_num)++;
             //memset(stack_buf, 0, CMDLINE_MAX);
+
+
+		printf("TEST\n");
+		for (int k = 0; k < *dir_num; k++) {
+			printf("num: %d\n", k);
+			printf("stack: %s\n", dir_stack[k]);
+			fflush(stdout);
+		}
+
+
+
+
+
             return(0);
         }
         else {
@@ -198,11 +213,9 @@ int built_in_funct(char** arg_array, char** dir_stack, char* pwd_buf, char* stac
     {
         if (*dir_num > 0)
         {
-            int i = *dir_num;
-            printf("Dir_num :%d\n", *dir_num);
-            memset(dir_stack[i], 0, strlen(dir_stack[i]));
+            printf("Dir_num: %d\n", *dir_num);
             (*dir_num)--;
-            printf("Dir_num :%d\n", *dir_num);
+            printf("Dir_num: %d\n", *dir_num);
             return(0);
         }
         else {
@@ -214,9 +227,10 @@ int built_in_funct(char** arg_array, char** dir_stack, char* pwd_buf, char* stac
     /* and prints the current state of the directory stack string.        */
     else
     {
-        if (*dir_num >= 0) {
-            printf("Dir_num :%d\n", *dir_num);
-            int j = *dir_num;
+    	int dir_num_cpy = *dir_num - 1;
+        if (dir_num_cpy >= 0) {
+            printf("Dir_num: %d\n", dir_num_cpy);
+            int j = dir_num_cpy;
             for (int i = j; i > -1; i--)
             {
                 fprintf(stdout, "%s\n", dir_stack[i]);
@@ -231,15 +245,18 @@ int built_in_funct(char** arg_array, char** dir_stack, char* pwd_buf, char* stac
 }
 int main(void)
 {
-    char* arg_array[ARG_MAX];
+    char* arg_array[USR_ARG_MAX];
 
     /* string to hold the working directory (stack) */
     char pwd_buf[CMDLINE_MAX];
     char stack_buf[CMDLINE_MAX];
-    char* dir_stack[ARG_MAX];
+    char* dir_stack[USR_ARG_MAX];
 
     int dir_num = 0;
-    dir_stack[dir_num] = getcwd(stack_buf, CMDLINE_MAX);
+    dir_stack[dir_num] = malloc(sizeof(char) * CMDLINE_MAX);
+    getcwd(stack_buf, CMDLINE_MAX);
+    strcpy(dir_stack[0], stack_buf);
+    dir_num++;
 
     char cmd[CMDLINE_MAX];
     int arg_num = 0;
