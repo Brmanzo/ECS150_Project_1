@@ -1,61 +1,49 @@
-processCount = pipe_count + 1;
 
+void forkSetRun() {
 
-declare pfd12[2]
-declare pfd23[2]
-declare pfd34[2]
- or
-int pfd[3][2];
+	int processCount = pipe_count + 1;
+	int pipefds[processCount - 1][2];
+	int myProcessIndex = 1; // Manually counted PID to be copied / passed
 
-for each pfd[x]
-	pipe(pfd[x]);
-
-for each struct within structArray
-
-	for processCount {
-		if child
-			break
-
-		if parent {
-			fork();
-
+	for (int i = 0; i < processCount; i++) {
+		pipe(pipefds[i]);
 	}
 
-	if child
-		change file descriptors:
-			pipe in: pipe(fd[2]) -> dup2(fd[0], STDIN), dup2(fd[1], STDOUT)
-			 or
-			file in:
+	for (int j = 0; j < processCount; j++) { 
+		if (fork()) { //child process
+			if (myProcessIndex == 1) {
+				dup2(pipefds[myProcessIndex-1][0], STDOUT_FILENO);
+				if (org_cmd_array[myProcessIndex-1].redirIn) {
+					int redirfd = open(org_cmd_array[myProcessIndex-1].filename);
+					dup2(redirfd, STDIN_FILENO);
+				}
+			} else if (myPID == processCount) {
+				dup2(pipefds[myProcessIndex-2][1], STDIN_FILENO);
+				if (org_cmd_array[myProcessIndex-1].redirIn) {
+					int redirfd = open(org_cmd_array[myProcessIndex-1].filename);
+					dup2(redirfd, STDOUT_FILENO);
+				}
+			} else {
+				dup2(pipefds[myProcessIndex-2][1], STDIN_FILENO);
+				dup2(pipefds[myProcessIndex-1][0], STDOUT_FILENO);
+			}
+			for (int k = 0; k < processCount - 1; k++) {
+				int pipeFDIn = 3 + (2 * k);
+				int pipeFDOut = 4 + (2 * k);
+				close(pipeFDIn);
+				close(pipeFDOut);
+			}
+			execvp(org_cmd_array[myProcessIndex-1].processName, org_cmd_array[myProcessIndex-1].processArgs);
+		} else {
+			myID++;
+		}
+	}
 
-			pipe out:
-			 or
-			file out:
+	//Everything after above for loop is supposed to be parent only process
+	int status = 0;
+	int retstatus;
+	while((retstatus = wait(&status)) > 0); //source: https://stackoverflow.com/questions/19461744/how-to-make-parent-wait-for-all-child-processes-to-finish
 
-		execvp with program name,
-		
-
-	else if parent (shell)
-
-		wait for all child pids
-
-		return
-
-
-int pfd[processCount - 1][2];
-
-for (int r = 0; r < processCount; r++) {
-	pipe(pfd[i]);
+	return retstatus;
 }
 
-/* say processCount == 3:
-	sharedFileTable[0] == STDIN_FILENO
-	sharedFileTable[3] == pfd[0][in == 0]         pid1[stdout] -> pfd[0][in]   // if(not last element) : dup2(pfd[pid-1][0], STDOUT_FILENO);
-	sharedFileTable[4] == pfd[0][out == 1]	      pid2[stdin]  -> pfd[0][out]  // if(not first element) : dup2(pfd[pid-2][1], STDIN_FILENO);
-	sharedFileTable[5] == pfd[1][in]	      pid2[stdout] -> pfd[1][in]   
-	sharedFileTable[6] == pfd[1][out]     	      pid3[stdin]  -> pfd[1][out]
-	                                	      pfd3[stdout] -> terminal out 
-
-	
-
-
-*/
