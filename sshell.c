@@ -15,7 +15,7 @@
 #define USR_ARG_MAX 16
 #define TOK_LEN_MAX 32
 
-typedef struct org_cmd{
+typedef struct org_cmd {
 
     // Separate Name and Args for execv
     char processName[TOK_LEN_MAX + 1];
@@ -52,7 +52,7 @@ org_cmd* organizeProcesses(org_cmd usrProcessArr[], char* inputCmds[], int numCm
     }
 
     for (int i = 0; i < numCmds; i++) {
-        if (!strncmp(inputCmds[i], "|", 1)) 
+        if (!strncmp(inputCmds[i], "|", 1))
         {
             usrProcessArr[p].pipeOut = true;
             usrProcessArr[++p].pipeIn = true;
@@ -135,7 +135,7 @@ void error_handler(int error_code)
 }
 /* This function inserts spaces surrounding the redirect characters */
 /* in order to account for the edge case where there is no space    */
-char* redir_space(char* cmd)
+char* redir_space(char* cmd, int* pipe_num)
 {
     char buf_cmd[CMDLINE_MAX + 1];
     memset(buf_cmd, 0, sizeof(buf_cmd));
@@ -163,6 +163,12 @@ char* redir_space(char* cmd)
             j++;
             /* Otherwise it simply buffers the character into the new array */
         }
+        else if (cmd[i] == '|')
+        {
+            (*pipe_num)++;
+            buf_cmd[j] = cmd[i];
+            j++;
+        }
         else {
             buf_cmd[j] = cmd[i];
             j++;
@@ -172,10 +178,10 @@ char* redir_space(char* cmd)
 }
 /* This function splits the input cmd string into an array of strings */
 /* by treating spaces as tokens                                       */
-int funct_parse(char* cmd, char** arg_array)
+int funct_parse(char* cmd, char** arg_array, int* pipe_num)
 {
     /* Inserts spaces surrounding redirection characters */
-    char* buf_arr = redir_space(cmd);
+    char* buf_arr = redir_space(cmd, pipe_num);
 
     int arg_num = 0;
 
@@ -238,15 +244,16 @@ int built_in_funct(char** arg_array, char** dir_stack, char* pwd_buf, char* stac
     {
         int DirEntry = chdir(arg_array[1]);
 
-        if (DirEntry == 0) 
+        if (DirEntry == 0)
         {
             int i = *dir_num;
-	        dir_stack[i] = malloc(sizeof(char) * CMDLINE_MAX);
-	        getcwd(stack_buf, CMDLINE_MAX);
+            dir_stack[i] = malloc(sizeof(char) * CMDLINE_MAX);
+            getcwd(stack_buf, CMDLINE_MAX);
             strcpy(dir_stack[i], stack_buf);
             (*dir_num)++;
             return(0);
-        } else {
+        }
+        else {
             error_handler(NO_SUCH_DIR);
             return(1);
         }
@@ -257,7 +264,7 @@ int built_in_funct(char** arg_array, char** dir_stack, char* pwd_buf, char* stac
     {
         if (*dir_num > 0)
         {
-            (*dir_num)-=2;
+            (*dir_num) -= 2;
             int i = *dir_num;
             fprintf(stderr, "stack being changed to when popped: %s\n", dir_stack[i]);
             int DirEntry = chdir(dir_stack[i]);
@@ -273,7 +280,7 @@ int built_in_funct(char** arg_array, char** dir_stack, char* pwd_buf, char* stac
     /* and prints the current state of the directory stack string.        */
     else
     {
-    	int dir_num_cpy = *dir_num - 1;
+        int dir_num_cpy = *dir_num - 1;
         if (dir_num_cpy >= 0) {
             int j = dir_num_cpy;
             for (int i = j; i > -1; i--)
@@ -325,6 +332,8 @@ int main(void)
     char stack_buf[CMDLINE_MAX];
     char* dir_stack[USR_ARG_MAX];
 
+    int pipe_num = 0;
+
     int dir_num = 0;
     dir_stack[dir_num] = malloc(sizeof(char) * CMDLINE_MAX);
     getcwd(stack_buf, CMDLINE_MAX);
@@ -362,7 +371,7 @@ int main(void)
 
         /* Parses arguments from string cmd into array of solitary */
         /* strings, each its own argument or token (<, >, |)       */
-        arg_num = funct_parse(cmd, arg_array);
+        arg_num = funct_parse(cmd, arg_array, &pipe_num);
 
         /* Exit must be within main in order to break from program */
         /* instead of breaking from a fork                         */
