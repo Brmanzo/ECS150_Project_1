@@ -56,7 +56,7 @@ org_cmd* organizeProcesses(org_cmd usrProcessArr[],
       usrProcessArr[++p].pipeIn = true;
       firstArg = true;
 
-      printf("Pipe\n");
+      //printf("Pipe\n");
       fflush(stdout);
       continue;
     }
@@ -67,7 +67,7 @@ org_cmd* organizeProcesses(org_cmd usrProcessArr[],
       firstArg = false;
       argCount = 0;
 
-      printf("Input: %s\n", usrProcessArr[p].filename);
+      //printf("Input: %s\n", usrProcessArr[p].filename);
       fflush(stdout);
       continue;
     }
@@ -77,7 +77,7 @@ org_cmd* organizeProcesses(org_cmd usrProcessArr[],
       i++;
       firstArg = false;
 
-      printf("Output: %s\n", usrProcessArr[p].filename);
+      //printf("Output: %s\n", usrProcessArr[p].filename);
       fflush(stdout);
       continue;
     }
@@ -87,7 +87,7 @@ org_cmd* organizeProcesses(org_cmd usrProcessArr[],
       firstArg = false;
       argCount = 0;
 
-      printf("Name: %s\n", usrProcessArr[p].processName);
+      //printf("Name: %s\n", usrProcessArr[p].processName);
       fflush(stdout);
     } else {
       usrProcessArr[p].processArgs[argCount] = malloc(sizeof(char)
@@ -95,8 +95,8 @@ org_cmd* organizeProcesses(org_cmd usrProcessArr[],
       strcpy(usrProcessArr[p].processArgs[argCount], inputCmds[i]);
       argCount++;
 
-      printf("Arg %d: %s\n", argCount - 1, 
-        usrProcessArr[p].processArgs[argCount - 1]);
+      //printf("Arg %d: %s\n", argCount - 1, 
+      //  usrProcessArr[p].processArgs[argCount - 1]);
       fflush(stdout);
       }
   }
@@ -226,14 +226,12 @@ int funct_parse(char* cmd, char** arg_array, int* pipe_num, int* redir_num)
     error_handler(TOO_MANY_ARGS);
   arg_array[arg_num] = NULL;
 
-  if ((!strcmp(arg_array[0], ">")) || (!strcmp(arg_array[0], "|")) || (!strcmp(arg_array[arg_num], "|")))
+  if ((!strcmp(arg_array[0], ">")) || (!strcmp(arg_array[0], "|")) || (!strcmp(arg_array[arg_num-1], "|")))
     error_handler(MISSING_CMD);
-  if ((!strcmp(arg_array[arg_num], ">")))
+  if ((!strcmp(arg_array[arg_num - 1], ">")))
     error_handler(NO_OUTPUT_F);
-  if ((redir_num != 0) && (strcmp(arg_array[arg_num - 1], ">")))
-      error_handler(MISLOC_OUT_DIR);
-  if ((strcmp(arg_array[arg_num], "<")))
-      error_handler(NO_INPUT_F);
+  //if ((strcmp(arg_array[arg_num - 1], "<")))
+  //    error_handler(NO_INPUT_F);
   /* Returns number of strings in new array */
   return arg_num;
 }
@@ -319,29 +317,30 @@ int built_in_funct(char** arg_array, char** dir_stack, char* pwd_buf,
     }
   }
 }
-void forkSetRun(int pipe_count, org_cmd* org_cmd_array) {
-
+int forkSetRun(int pipe_count, org_cmd* org_cmd_array) {
+  
   int processCount = pipe_count + 1;
   int pipefds[processCount - 1][2];
   int myProcessIndex = 1; // Manually counted PID to be copied / passed
 
+  fprintf(stderr, "command: %s, args: %s\n", org_cmd_array[myProcessIndex - 1].processName, org_cmd_array[myProcessIndex - 1].processArgs[0]);
+
   for (int i = 0; i < processCount; i++) {
     pipe(pipefds[i]);
   }
-
   for (int j = 0; j < processCount; j++) {
     if (fork()) { //child process
-      if (myProcessIndex == 1) {
+      /*if (myProcessIndex == 1) {
         dup2(pipefds[myProcessIndex - 1][0], STDOUT_FILENO);
         if (org_cmd_array[myProcessIndex - 1].redirIn) {
-          int redirfd = open(org_cmd_array[myProcessIndex - 1].filename);
+          int redirfd = open(org_cmd_array[myProcessIndex - 1].filename, O_RDONLY);
           dup2(redirfd, STDIN_FILENO);
         }
       }
-      else if (myPID == processCount) {
+      else if (myProcessIndex == processCount) {
         dup2(pipefds[myProcessIndex - 2][1], STDIN_FILENO);
         if (org_cmd_array[myProcessIndex - 1].redirIn) {
-          int redirfd = open(org_cmd_array[myProcessIndex - 1].filename);
+          int redirfd = open(org_cmd_array[myProcessIndex - 1].filename, O_WRONLY);
           dup2(redirfd, STDOUT_FILENO);
         }
       }
@@ -354,19 +353,21 @@ void forkSetRun(int pipe_count, org_cmd* org_cmd_array) {
         int pipeFDOut = 4 + (2 * k);
         close(pipeFDIn);
         close(pipeFDOut);
-      }
-      execvp(org_cmd_array[myProcessIndex - 1].processName, org_cmd_array[myProcessIndex - 1].processArgs);
+      }*/
+      /*execvp(org_cmd_array[myProcessIndex - 1].processName, org_cmd_array[myProcessIndex - 1].processArgs);*/
+        _exit(0);
     }
     else {
-      myID++;
+        fprintf(stderr, "Process Index: %d\n", myProcessIndex);
+        myProcessIndex++;
     }
   }
   //Everything after above for loop is supposed to be parent only process
   int status = 0;
-  int retstatus;
-  while ((retstatus = wait(&status)) > 0); //source: https://stackoverflow.com/questions/19461744/how-to-make-parent-wait-for-all-child-processes-to-finish
+  int retval;
+  while ((retval = wait(&status)) > 0); //source: https://stackoverflow.com/questions/19461744/how-to-make-parent-wait-for-all-child-processes-to-finish
 
-  return retstatus;
+  return retval;
 }
 /* Custom system function to execute the shell command. */
 int our_system(char** arg_array, org_cmd* org_cmd_array, int* redir_num, int* pipe_num)
@@ -378,16 +379,14 @@ int our_system(char** arg_array, org_cmd* org_cmd_array, int* redir_num, int* pi
   /* Child Path */
   if (pid == 0)
   {
-    if ((redir_num == 0) && (pipe_num == 0)) {
+    if ((*redir_num == 0) && (*pipe_num == 0)) {
       /* using execv for array of arguments, -p to access PATH variables. */
       execvp(arg_array[0], arg_array);
       _exit(1);
     } else {
-        forkSetRun(pipe_num, org_cmd_array);
+      forkSetRun(*pipe_num, org_cmd_array);
+      _exit(1);
     }
-    /* using execv for array of arguments, -p to access PATH variables. */
-    execvp(arg_array[0], arg_array);
-    _exit(1);
   }
   /* The fork failed. Report failure. */
   else if (pid < 0)
