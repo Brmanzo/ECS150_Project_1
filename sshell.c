@@ -25,6 +25,7 @@ enum {
     MISSING_CMD,
     NO_OUTPUT_F,
     CANT_OPEN_OUT_F,
+    CANT_OPEN_IN_F,
     MISLOC_OUT_DIR,
     NO_INPUT_F,
     MISLOC_IN_DIR
@@ -57,6 +58,9 @@ void error_handler(int error_code)
         break;
     case CANT_OPEN_OUT_F:
         fprintf(stderr, "Error: cannot open output file\n");
+        break;
+    case CANT_OPEN_IN_F:
+        fprintf(stderr, "Error: cannot open input file\n");
         break;
     case MISLOC_OUT_DIR:
         fprintf(stderr, "Error: mislocated output redirection\n");
@@ -253,14 +257,15 @@ int Redirect(int in_redir_num, int out_redir_num, char** arg_array, int arg_num)
 
     char* par_array[USR_ARG_MAX];
 
-    while (strcmp(arg_array[i], ">"))
+    if ((in_redir_num == 0) && (out_redir_num > 0))
     {
-        par_array[i] = arg_array[i];
-        i++;
-    }
-    par_array[i] = NULL;
+        while (strcmp(arg_array[i], ">"))
+        {
+            par_array[i] = arg_array[i];
+            i++;
+        }
+        par_array[i] = NULL;
 
-    if ((in_redir_num == 0) && (out_redir_num > 0)) {
         fd = open(arg_array[arg_num - 1], O_WRONLY | O_CREAT | O_TRUNC, 0644);
         if (fd >= 0)
         {
@@ -275,7 +280,29 @@ int Redirect(int in_redir_num, int out_redir_num, char** arg_array, int arg_num)
             return(2);
         }
     }
-    return(5); //Still adding functionality
+    else
+    {
+        while (strcmp(arg_array[i], "<"))
+        {
+            par_array[i] = arg_array[i];
+            i++;
+        }
+        par_array[i] = NULL;
+
+        fd = open(arg_array[arg_num - 1], O_RDONLY);
+        if (fd >= 0)
+        {
+            dup2(fd, STDIN_FILENO);
+            close(fd);
+            execvp(arg_array[0], par_array);
+            _exit(1);
+        }
+        else
+        {
+            error_handler(CANT_OPEN_IN_F);
+            return(2);
+        }
+    }
 }
 /* Custom system function to execute the shell command. */
 int our_system(char** arg_array, int* pipe_num, int* in_redir_num, int* out_redir_num, int arg_num)
