@@ -101,6 +101,7 @@ org_cmd* organizeProcesses(org_cmd usrProcessArr[],
             fflush(stdout);
         }
     }
+
     return usrProcessArr;
 }
 /* Enums to pass when handling errors. */
@@ -333,36 +334,42 @@ int built_in_funct(char** arg_array, char** dir_stack, char* pwd_buf,
         }
     }
 }
-int forkSetRun(int pipe_count, org_cmd* org_cmd_array) {
+void forkSetRun(int pipe_count, org_cmd* org_cmd_array) {
 
     int processCount = pipe_count + 1;
     int pipefds[processCount - 1][2];
-    int myProcessIndex = 1; // Manually counted PID to be copied / passed
-
-    fprintf(stderr, "command: %s, args: %s\n", org_cmd_array[myProcessIndex - 1].processName, org_cmd_array[myProcessIndex - 1].processArgs[0]);
+    int myProcessIndex = 0; // Manually counted ProcessID to be copied / passed, not to be confused with actual PID
+    int PIDs[processCount];
 
     for (int i = 0; i < processCount; i++) {
-        pipe(pipefds[i]);
+        if(pipe(pipefds[i]) == -1) {
+	fprintf(stderr, "Pipe %d Failed\n", i);
+	_exit(1);
+	}
     }
     for (int j = 0; j < processCount; j++) {
-        if (fork()) { //child process
-          if (myProcessIndex == 1) {
-            dup2(pipefds[myProcessIndex - 1][0], STDOUT_FILENO);
-            if (org_cmd_array[myProcessIndex - 1].redirIn) {
-              int redirfd = open(org_cmd_array[myProcessIndex - 1].filename, O_RDONLY);
+	sleep(1 + myProcessIndex); //Guarantees process n runs before n+1. Useful for testing
+        PIDs[j] = fork();
+
+	if (!PIDs[j]) { //child process
+	  fprintf(stderr,"This is Process %d. I am running %s.\n", myProcessIndex, org_cmd_array[myProcessIndex].processName);
+	  if (myProcessIndex == 0) {
+            dup2(pipefds[myProcessIndex][0], STDOUT_FILENO);
+            if (org_cmd_array[myProcessIndex].redirIn) {
+              int redirfd = open(org_cmd_array[myProcessIndex].filename, O_RDONLY);
               dup2(redirfd, STDIN_FILENO);
             }
           }
-          else if (myProcessIndex == processCount) {
-            dup2(pipefds[myProcessIndex - 2][1], STDIN_FILENO);
-            if (org_cmd_array[myProcessIndex - 1].redirIn) {
-              int redirfd = open(org_cmd_array[myProcessIndex - 1].filename, O_WRONLY);
+          else if (myProcessIndex == processCount - 1) {
+            dup2(pipefds[myProcessIndex - 1][1], STDIN_FILENO);
+            if (org_cmd_array[myProcessIndex].redirIn) {
+              int redirfd = open(org_cmd_array[myProcessIndex].filename, O_WRONLY);
               dup2(redirfd, STDOUT_FILENO);
             }
           }
           else {
-            dup2(pipefds[myProcessIndex - 2][1], STDIN_FILENO);
-            dup2(pipefds[myProcessIndex - 1][0], STDOUT_FILENO);
+            dup2(pipefds[myProcessIndex - 1][1], STDIN_FILENO);
+            dup2(pipefds[myProcessIndex][0], STDOUT_FILENO);
           }
           for (int k = 0; k < processCount - 1; k++) {
             int pipeFDIn = 3 + (2 * k);
@@ -370,20 +377,24 @@ int forkSetRun(int pipe_count, org_cmd* org_cmd_array) {
             close(pipeFDIn);
             close(pipeFDOut);
           }
-          execvp(org_cmd_array[myProcessIndex - 1].processName, org_cmd_array[myProcessIndex - 1].processArgs);
-            _exit(0);
+
+          execvp(org_cmd_array[myProcessIndex].processName, org_cmd_array[myProcessIndex].processArgs);
+          _exit(1);
         }
         else {
-            fprintf(stderr, "Process Index: %d\n", myProcessIndex);
             myProcessIndex++;
         }
     }
     //Everything after above for loop is supposed to be parent only process
-    int status = 0;
-    int retval;
-    while ((retval = wait(&status)) > 0); //source: https://stackoverflow.com/questions/19461744/how-to-make-parent-wait-for-all-child-processes-to-finish
-
-    return retval;
+    //int status = 0;
+    int retvals[processCount];
+    for (int l = 0; l < processCount; l++) {
+    	retvals[l] = waitpid(PIDs[l], NULL, 0);
+    }
+    for (int l = 0; l < processCount; l++) {
+    	fprintf(stderr, "Return Value is: %d for PID: %d\n", retvals[l], PIDs[l]);
+    }
+    return;
 }
 /* Custom system function to execute the shell command. */
 int our_system(char** arg_array, org_cmd* org_cmd_array, int* redir_num, int* pipe_num)
@@ -391,16 +402,19 @@ int our_system(char** arg_array, org_cmd* org_cmd_array, int* redir_num, int* pi
     int status = 0;
     pid_t pid;
 
+
     pid = fork();
     /* Child Path */
     if (pid == 0)
     {
         if ((*redir_num == 0) && (*pipe_num == 0)) {
             /* using execv for array of arguments, -p to access PATH variables. */
+fprintf(stderr, "HERE\n");
             execvp(arg_array[0], arg_array);
             _exit(1);
         }
         else {
+fprintf(stderr, "THERE\n");
             forkSetRun(*pipe_num, org_cmd_array);
             _exit(1);
         }
@@ -495,6 +509,7 @@ int main(void)
                     /* Otherwise, the arg_array will be constructed into an */
                     /* organized array to handle piping and redirection.    */
                     org_cmd org_cmd_array[pipe_num + 1];
+
                     organizeProcesses(org_cmd_array, arg_array, arg_num);
 
                     /* Calls System to execute non-exit command, actual command*/
