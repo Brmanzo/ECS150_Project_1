@@ -15,107 +15,19 @@
 #define USR_ARG_MAX 16
 #define TOK_LEN_MAX 32
 
-typedef struct org_cmd {
-    // Separate Name and Args for execv
-    char processName[TOK_LEN_MAX + 1];
-    char* processArgs[USR_ARG_MAX];
-    char filename[TOK_LEN_MAX + 1];
-
-    // To allow / deny usage of fdIn and fdOut variables
-    // Possible that we only need one set, to remove if needed later
-    bool pipeIn;
-    bool pipeOut;
-    bool redirIn;
-    bool redirOut;
-
-    // To be initialized after
-    int fdIn;
-    int fdOut;
-}org_cmd;
-
-// Declare array of struct outside of this scope and pass by reference
-org_cmd* organizeProcesses(org_cmd usrProcessArr[],
-    char* inputCmds[], int numCmds)
-{ // numCmds includes | and <> symbols
-    int p = 0; // iterator for process in usrProcessArr
-    bool firstArg = true; // toggle within for loop
-    int argCount = 0; // iterator for struct argument array parameter
-
-    //initialize struct
-    for (int j = 0; j < 5; j++)
-    {
-        usrProcessArr[j].pipeIn = false;
-        usrProcessArr[j].pipeOut = false;
-        usrProcessArr[j].redirIn = false;
-        usrProcessArr[j].redirOut = false;
-    }
-    for (int i = 0; i < numCmds; i++) {
-        if (!strncmp(inputCmds[i], "|", 1))
-        {
-            usrProcessArr[p].pipeOut = true;
-            usrProcessArr[++p].pipeIn = true;
-            firstArg = true;
-
-            //printf("Pipe\n");
-            fflush(stdout);
-            continue;
-        }
-        if (!strncmp(inputCmds[i], "<", 1)) { //input redir, program < file
-            usrProcessArr[p].redirIn = true;
-            strcpy(usrProcessArr[p].filename, inputCmds[i + 1]);
-            i++;
-            firstArg = false;
-            argCount = 0;
-
-            //printf("Input: %s\n", usrProcessArr[p].filename);
-            fflush(stdout);
-            continue;
-        }
-        if (!strncmp(inputCmds[i], ">", 1)) {
-            usrProcessArr[p].redirOut = true;
-            strcpy(usrProcessArr[p].filename, inputCmds[i + 1]);
-            i++;
-            firstArg = false;
-
-            //printf("Output: %s\n", usrProcessArr[p].filename);
-            fflush(stdout);
-            continue;
-        }
-        if (firstArg)
-        {
-            strcpy(usrProcessArr[p].processName, inputCmds[i]);
-            firstArg = false;
-            argCount = 0;
-
-            //printf("Name: %s\n", usrProcessArr[p].processName);
-            fflush(stdout);
-        }
-        else {
-            usrProcessArr[p].processArgs[argCount] = malloc(sizeof(char)
-                * strlen(inputCmds[i]));
-            strcpy(usrProcessArr[p].processArgs[argCount], inputCmds[i]);
-            argCount++;
-
-            //printf("Arg %d: %s\n", argCount - 1, 
-            //  usrProcessArr[p].processArgs[argCount - 1]);
-            fflush(stdout);
-        }
-    }
-    return usrProcessArr;
-}
 /* Enums to pass when handling errors. */
 enum {
-  TOO_MANY_ARGS,
-  CANT_CD_DIR,
-  NO_SUCH_DIR,
-  DIR_STACK_EMPTY,
-  CMD_NOT_FOUND,
-  MISSING_CMD,
-  NO_OUTPUT_F,
-  CANT_OPEN_OUT_F,
-  MISLOC_OUT_DIR,
-  NO_INPUT_F,
-  MISLOC_IN_DIR
+    TOO_MANY_ARGS,
+    CANT_CD_DIR,
+    NO_SUCH_DIR,
+    DIR_STACK_EMPTY,
+    CMD_NOT_FOUND,
+    MISSING_CMD,
+    NO_OUTPUT_F,
+    CANT_OPEN_OUT_F,
+    MISLOC_OUT_DIR,
+    NO_INPUT_F,
+    MISLOC_IN_DIR
 };
 /* Function to handle errors, recieves an enum to determine error code. */
 void error_handler(int error_code)
@@ -157,12 +69,13 @@ void error_handler(int error_code)
 /* function to clear the array of strings buffer */
 void buf_clear(int arg_num, char** arg_array)
 {
-    for (int i = 0; i < arg_num - 1; i++)
+    for (int i = 0; i < arg_num; i++)
         memset(arg_array[i], 0, strlen(arg_array[i]));
+    arg_array[arg_num - 1] = NULL;
 }
 /* This function inserts spaces surrounding the redirect characters */
 /* in order to account for the edge case where there is no space    */
-char* redir_space(char* cmd, int* pipe_num, int* redir_num)
+char* redir_space(char* cmd, int* pipe_num, int* in_redir_num, int* out_redir_num)
 {
     char buf_cmd[CMDLINE_MAX + 1];
     memset(buf_cmd, 0, sizeof(buf_cmd));
@@ -173,6 +86,7 @@ char* redir_space(char* cmd, int* pipe_num, int* redir_num)
     {
         if (cmd[i] == '<')
         {
+            (*in_redir_num)++;
             buf_cmd[j] = ' ';
             j++;
             buf_cmd[j] = '<';
@@ -182,7 +96,7 @@ char* redir_space(char* cmd, int* pipe_num, int* redir_num)
         }
         else if (cmd[i] == '>')
         {
-            (*redir_num)++;
+            (*out_redir_num)++;
             buf_cmd[j] = ' ';
             j++;
             buf_cmd[j] = '>';
@@ -207,10 +121,10 @@ char* redir_space(char* cmd, int* pipe_num, int* redir_num)
 }
 /* This function splits the input cmd string into an */
 /* array of strings by treating spaces as tokens.    */
-int funct_parse(char* cmd, char** arg_array, int* pipe_num, int* redir_num)
+int funct_parse(char* cmd, char** arg_array, int* pipe_num, int* in_redir_num, int* out_redir_num)
 {
     /* Inserts spaces surrounding redirection characters */
-    char* buf_arr = redir_space(cmd, pipe_num, redir_num);
+    char* buf_arr = redir_space(cmd, pipe_num, in_redir_num, out_redir_num);
     int arg_num = 0;
 
     char* cmd_arg = strtok(buf_arr, " \n");
@@ -333,60 +247,38 @@ int built_in_funct(char** arg_array, char** dir_stack, char* pwd_buf,
         }
     }
 }
-int forkSetRun(int pipe_count, org_cmd* org_cmd_array) {
+int Redirect(int in_redir_num, int out_redir_num, char** arg_array, int arg_num) {
+    int fd = 0;
+    int i = 0;
 
-    int processCount = pipe_count + 1;
-    int pipefds[processCount - 1][2];
-    int myProcessIndex = 1; // Manually counted PID to be copied / passed
+    char* par_array[USR_ARG_MAX];
 
-    fprintf(stderr, "command: %s, args: %s\n", org_cmd_array[myProcessIndex - 1].processName, org_cmd_array[myProcessIndex - 1].processArgs[0]);
-
-    for (int i = 0; i < processCount; i++) {
-        pipe(pipefds[i]);
+    while (strcmp(arg_array[i], ">"))
+    {
+        par_array[i] = arg_array[i];
+        i++;
     }
-    for (int j = 0; j < processCount; j++) {
-        if (fork()) { //child process
-          if (myProcessIndex == 1) {
-            dup2(pipefds[myProcessIndex - 1][0], STDOUT_FILENO);
-            if (org_cmd_array[myProcessIndex - 1].redirIn) {
-              int redirfd = open(org_cmd_array[myProcessIndex - 1].filename, O_RDONLY);
-              dup2(redirfd, STDIN_FILENO);
-            }
-          }
-          else if (myProcessIndex == processCount) {
-            dup2(pipefds[myProcessIndex - 2][1], STDIN_FILENO);
-            if (org_cmd_array[myProcessIndex - 1].redirIn) {
-              int redirfd = open(org_cmd_array[myProcessIndex - 1].filename, O_WRONLY);
-              dup2(redirfd, STDOUT_FILENO);
-            }
-          }
-          else {
-            dup2(pipefds[myProcessIndex - 2][1], STDIN_FILENO);
-            dup2(pipefds[myProcessIndex - 1][0], STDOUT_FILENO);
-          }
-          for (int k = 0; k < processCount - 1; k++) {
-            int pipeFDIn = 3 + (2 * k);
-            int pipeFDOut = 4 + (2 * k);
-            close(pipeFDIn);
-            close(pipeFDOut);
-          }
-          execvp(org_cmd_array[myProcessIndex - 1].processName, org_cmd_array[myProcessIndex - 1].processArgs);
-            _exit(0);
+    par_array[i] = NULL;
+
+    if ((in_redir_num == 0) && (out_redir_num > 0)) {
+        fd = open(arg_array[arg_num - 1], O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        if (fd >= 0)
+        {
+            dup2(fd, STDOUT_FILENO);
+            close(fd);
+            execvp(arg_array[0], par_array);
+            _exit(1);
         }
-        else {
-            fprintf(stderr, "Process Index: %d\n", myProcessIndex);
-            myProcessIndex++;
+        else
+        {
+            error_handler(CANT_OPEN_OUT_F);
+            return(2);
         }
     }
-    //Everything after above for loop is supposed to be parent only process
-    int status = 0;
-    int retval;
-    while ((retval = wait(&status)) > 0); //source: https://stackoverflow.com/questions/19461744/how-to-make-parent-wait-for-all-child-processes-to-finish
-
-    return retval;
+    return(5); //Still adding functionality
 }
 /* Custom system function to execute the shell command. */
-int our_system(char** arg_array, org_cmd* org_cmd_array, int* redir_num, int* pipe_num)
+int our_system(char** arg_array, int* pipe_num, int* in_redir_num, int* out_redir_num, int arg_num)
 {
     int status = 0;
     pid_t pid;
@@ -395,13 +287,14 @@ int our_system(char** arg_array, org_cmd* org_cmd_array, int* redir_num, int* pi
     /* Child Path */
     if (pid == 0)
     {
-        if ((*redir_num == 0) && (*pipe_num == 0)) {
+        if ((*in_redir_num == 0) && (*out_redir_num == 0) && (*pipe_num == 0)) {
             /* using execv for array of arguments, -p to access PATH variables. */
             execvp(arg_array[0], arg_array);
             _exit(1);
         }
-        else {
-            forkSetRun(*pipe_num, org_cmd_array);
+        else if (((*in_redir_num == 1) || (*out_redir_num == 1)) && (*pipe_num == 0))
+        {
+            status = Redirect(*in_redir_num, *out_redir_num, arg_array, arg_num);
             _exit(1);
         }
     }
@@ -438,12 +331,17 @@ int main(void)
 
     /* Character Counters. */
     int pipe_num = 0;
-    int redir_num = 0;
+
+    int in_redir_num = 0;
+    int out_redir_num = 0;
 
     while (1)
     {
         char* nl;
         int retval = 0;
+
+        in_redir_num = 0;
+        out_redir_num = 0;
 
         /* Print prompt */
         printf("sshell$ ");
@@ -470,7 +368,7 @@ int main(void)
 
             /* Parses arguments from string cmd into array of solitary */
             /* strings, each its own argument or token (<, >, |)       */
-            arg_num = funct_parse(cmd, arg_array, &pipe_num, &redir_num);
+            arg_num = funct_parse(cmd, arg_array, &pipe_num, &in_redir_num, &out_redir_num);
 
             if (arg_num > 0) {
                 /* Exit must be within main in order to break from program */
@@ -492,14 +390,13 @@ int main(void)
                     fprintf(stderr, "+ completed '%s' [%d]\n", cmd, retval);
                 }
                 else {
+
                     /* Otherwise, the arg_array will be constructed into an */
                     /* organized array to handle piping and redirection.    */
-                    org_cmd org_cmd_array[pipe_num + 1];
-                    organizeProcesses(org_cmd_array, arg_array, arg_num);
 
                     /* Calls System to execute non-exit command, actual command*/
                     /* identification takes place in our_system function       */
-                    retval = our_system(arg_array, org_cmd_array, &redir_num, &pipe_num);
+                    retval = our_system(arg_array, &pipe_num, &in_redir_num, &out_redir_num, arg_num);
 
                     /* Returns value from non-exit command */
                     if (retval != 0)
