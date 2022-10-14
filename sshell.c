@@ -52,7 +52,7 @@ org_cmd* organizeProcesses(org_cmd usrProcessArr[],
     for (int i = 0; i < numCmds; i++) {
         if (!strncmp(inputCmds[i], "|", 1))
         {
-	    usrProcessArr[p].processArgs[i] = malloc(sizeof(char));
+	    usrProcessArr[p].processArgs[i] = malloc(2 * sizeof(char*));
 	    usrProcessArr[p].processArgs[i] = NULL;
 
             usrProcessArr[p].pipeOut = true;
@@ -65,13 +65,14 @@ org_cmd* organizeProcesses(org_cmd usrProcessArr[],
         }
         if (!strncmp(inputCmds[i], "<", 1)) { //input redir, program < file
 	
-	    usrProcessArr[p].processArgs[i] = malloc(sizeof(char));
+	    usrProcessArr[p].processArgs[i] = malloc(2 * sizeof(char*));
             usrProcessArr[p].processArgs[i] = NULL;
 	    
 	    usrProcessArr[p].redirIn = true;
             
 	    fprintf(stderr, "INPUT REDIR\n");
 	    strcpy(usrProcessArr[p].filename, inputCmds[i + 1]);
+	    fprintf(stderr, "%s\n", usrProcessArr[p].filename);
             i++;
             firstArg = false;
             argCount = 0;
@@ -82,13 +83,15 @@ org_cmd* organizeProcesses(org_cmd usrProcessArr[],
         }
         if (!strncmp(inputCmds[i], ">", 1)) {
 	    
-	    usrProcessArr[p].processArgs[i] = malloc(sizeof(char));
+	    usrProcessArr[p].processArgs[i] = malloc(2 * sizeof(char*));
 	    usrProcessArr[p].processArgs[i] = NULL;
 
             usrProcessArr[p].redirOut = true;
 
 	    fprintf(stderr, "OUTPUT REDIR\n");
 	    strcpy(usrProcessArr[p].filename, inputCmds[i + 1]);
+	    fprintf(stderr, "%s\n", usrProcessArr[p].filename);
+	    
             i++;
             firstArg = false;
 
@@ -365,7 +368,7 @@ void forkSetRun(int pipe_count, org_cmd* org_cmd_array) {
 	}
     }
     for (int j = 0; j < processCount; j++) {
-	sleep(1 + myProcessIndex); //Guarantees process n runs before n+1. Useful for testing
+	//sleep(1 + myProcessIndex); //Guarantees process n runs before n+1. Useful for testing
         PIDs[j] = fork();
 
 	if (!PIDs[j]) { //child process
