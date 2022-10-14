@@ -366,7 +366,7 @@ void forkSetRun(int pipe_count, org_cmd* org_cmd_array) {
 	fprintf(stderr, "Pipe %d Failed\n", i);
 	_exit(1);
 	}
-	fprintf(stderr, "FD Pipe%d In: %d, Out: %d\n", i, pipefds[i][0], pipefds[i][1]);
+	fprintf(stderr, "FD Pipe%d In: %d, Out: %d\n", i, pipefds[i][1], pipefds[i][0]);
     }
 
     
