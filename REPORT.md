@@ -16,7 +16,10 @@ check if any of the built-in functions are being called.
 ## Built-In Functions
 The first of the built-in functions is exceedingly simple, breaking from the
 main process when the user calls exit.
-## Piping
+
+If the requested command is not predefined or built-in, it will simply continue,
+passing the user entered command into execv
+## Multiple Pipes
 Currently, there are two instances of piping in the code. The working one
 takes a single piped input, while the yet broken one is designed to take in as
 many as needed. Should the parsed input be more than a simple command (<>|), the
@@ -26,8 +29,8 @@ of dynamically appropriate size is declared, to be called into the pipe()
 function. The 2D array is now filled with the appropriate file descriptors for
 each pipe's instream and outstream. This process is done before the fork, as
 every single forked process requires access to these descriptors to connect to
-each other. (Pipes declared within a forked process are inaccessible from
-outside). I created a loop to run as many times as there are commands. Each run
+each other. Pipes declared within a forked process are inaccessible from
+outside. I created a loop to run as many times as there are commands. Each run
 through the loop creates a fork, whose resulting child's ID is stored into an
 array. fork() returns a PID which can be any number > 0. To keep track of each
 process, I used an iterator p to tally and keep track of a custom PID, which
@@ -45,12 +48,12 @@ Pr0 Pr1 Pr2
 Finally, once each process properly hooks up their own in and out to each
 respective pipe, the children call execv using data from the predefined array of
 process structs.
-## Redirecting
+## Multiple Input / Output Redirections
 The first command (in a series of piped commands) may take an input
 redirection from a file. The final command may also redirect its output into a
 file. This is a similar process to piping, in which the file descriptors 0 and 1
 are swapped with the returned fd from open, rather than the return of pipe().
-## Process Structure Type
+## Process Structure Type (Original Plan)
 To keep track of each process and its properties, we defined a struct (yet
 unused due to broken code) for each command and its arguments. To construct the
 structure, an input of an array of strings is taken. The array of strings is the
@@ -71,3 +74,38 @@ easy organization and reading. Which is what I would say if my portion of
 dynamic piping and redirecting works. My wonderful and ingenious partner Bradley
 Manzo was able to implement his own threads of single piping and single
 redirects in the time it's taking me to squash bugs in my code.
+I understand these explanations of non-implemented sections seem pointless, but
+I believe at the very least it reveals our understandings of the general
+data structures / operations, including multiple pipes / redirects.
+## Single Piping / Redirection (Current Implementation)
+As the code stands currently, it only takes an option to either pipe or redirect
+in either direction once. Redirection in and out used the same dup2 function, 
+only changing the input channel (0 or 1) based on a conditional that checks
+between < and >.
+The piping is based on the lecture / slideshow example of piping. With multiple
+pipes it would be much easier to handle should a parent create children for each
+respective thread. This time, with a single pipe, it was feasible to simply
+connect the parent to the child. As there is another parent to the parent
+(shell), we can safely allow the new parent to exec then die. This presents a
+possible problem (that we have not yet encountered), where the parent finishes
+execution before the child. If so, the parent sends a SIGHUP to the child,
+possibly killing it before it finishes its process. Usually a pipe creates an
+organization within the kernel that blocks processes if they are dependent on
+an input / specific signal, but that may not always be the case.
+## Error Handling
+
+## Issues
+Kent: Though I was using cygwin through MobaXTerm, it seems there is still a
+discrepancy in behavior between this and a proper Unix environment - or at least
+the CSIF computers. Though the code was regularly tested through cygwin, there
+existed undiscovered undefined behavior when finally merged into csif
+environment. This will be taken into consideration for project 2 - work will
+start and finish completely within the bounds of csif! The rest of the issues
+stem from particular and unsolved technical issues, but we firmly believe that
+the high level concept to our program is legitimate.
+## Sources
+We used information and code snippets solely from lecture notes / slides, as
+well as the GNU C Library documentation.
+Certain error behaviors were analyzed with the help of various StackOverflow
+threads, but we did not use nor translate / paraphrase any code directly from
+the forums.
