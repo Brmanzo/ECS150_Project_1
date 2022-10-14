@@ -379,7 +379,7 @@ void forkSetRun(int pipe_count, org_cmd* org_cmd_array) {
 	if (!PIDs[j]) { //child process
 	  fprintf(stderr,"This is Process %d. I am running %s.\n", myProcessIndex, org_cmd_array[myProcessIndex].processName);
 	  if (myProcessIndex == 0) {
-            dup2(pipefds[myProcessIndex][0], STDOUT_FILENO);
+            dup2(pipefds[myProcessIndex][1], STDOUT_FILENO);
             if (org_cmd_array[myProcessIndex].redirIn) {
               int redirfd = open(org_cmd_array[myProcessIndex].filename, O_RDONLY);
 	      if(redirfd == -1) {
@@ -390,7 +390,7 @@ void forkSetRun(int pipe_count, org_cmd* org_cmd_array) {
             }
           }
           else if (myProcessIndex == processCount - 1) {
-            dup2(pipefds[myProcessIndex - 1][1], STDIN_FILENO);
+            dup2(pipefds[myProcessIndex - 1][0], STDIN_FILENO);
             if (org_cmd_array[myProcessIndex].redirOut) {
               int redirfd = open(org_cmd_array[myProcessIndex].filename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
 	      if(redirfd == -1) {
@@ -401,8 +401,8 @@ void forkSetRun(int pipe_count, org_cmd* org_cmd_array) {
             }
           }
           else {
-            dup2(pipefds[myProcessIndex - 1][1], STDIN_FILENO);
-            dup2(pipefds[myProcessIndex][0], STDOUT_FILENO);
+            dup2(pipefds[myProcessIndex - 1][0], STDIN_FILENO);
+            dup2(pipefds[myProcessIndex][1], STDOUT_FILENO);
           }
 
           for (int k = 0; k < processCount - 1; k++) {
