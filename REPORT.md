@@ -1,7 +1,7 @@
 Authors: Bradley Manzo, Kent Cassidy
 Date: October 13, 2022
 
-#Report 1
+# Report 1
 In order to implement a simple functioning shell, our development consisted
 of several phases: parsing the input, developing the built-in functions
 and the directory stack, devising a proper struct to store the argument array,
