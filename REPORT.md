@@ -2,13 +2,13 @@ Authors: Bradley Manzo, Kent Cassidy
 Date: October 13, 2022
 
 #Report 1
-        In order to implement a simple functioning shell, our development consisted
+In order to implement a simple functioning shell, our development consisted
 of several phases: parsing the input, developing the built-in functions
 and the directory stack, devising a proper struct to store the argument array,
 and implementing piping and redirection.
 
 ## Parsing
-        When retrieving the command line from the user, there are a series of
+When retrieving the command line from the user, there are a series of
 processes that must take place. The first step of our solution is inserting
 spaces surrounding the redirect and pipe characters using our insert_spaces 
 function. This is achieved through simple string iteration and is necessary
@@ -23,7 +23,7 @@ function to flush our arg_array which is allocated with 16 spaces
 functions are being called.
 
 ## Built-In Functions
-        The first of the built-in functions is exceedingly simple, breaking from the
+The first of the built-in functions is exceedingly simple, breaking from the
 main process when the user calls exit. The rest of our built-in functions are
 compartmentalized in a separate function. If arg_array[0] is "pwd" the current
 directory is printed to the terminal, and if "cd", the current directory is
@@ -38,7 +38,7 @@ should "pushd" to. Since this array stores the most recent directory at the
 greatest index, the stack is printed in reverse. 
 
 ## Piping
-        Currently, there are two instances of piping in the code. The working
+Currently, there are two instances of piping in the code. The working
 version takes a single piped input, while the deprecated one is designed to take
 in as many as needed. Should the parsed input be more than a simple command
 (<>|), the arguments would be passed into function forkSetRun, taking in the 
@@ -49,7 +49,7 @@ descriptors for each pipe's instream and outstream. This process is done before
 the fork, as every single forked process requires access to these descriptors to
 connect to each other. (Pipes declared within a forked process are inaccessible
 from outside).
-       We created a loop to run as many times as there are commands. Each run
+We created a loop to run as many times as there are commands. Each run
 through the loop creates a fork, whose resulting child's ID is stored into an
 array. fork() returns a PID which can be any number > 0. To keep track of each
 process, we used an iterator p to tally and keep track of a custom PID, which
@@ -57,7 +57,7 @@ increments from 0. The parent was set to wait for all processes as the end of
 the function. Though there is usually a race condition for each thread to
 finish, a properly implemented pipe should block processes until they receive
 the necessary input.
-        Now that the processes are ordered by traceable, incrementing integers, they
+Now that the processes are ordered by traceable, incrementing integers, they
 can interact with neighboring pipes using their own ID as an index. Each process
 with ID i will be hooked up to the out(1) of pipe i-1, and to the in(0) of pipe
 i.
@@ -71,7 +71,7 @@ respective pipe, the children call execv using data from the predefined array of
 process structs.
 
 ## Redirecting
-        In order to implement redirection, we first had to locate the position of
+In order to implement redirection, we first had to locate the position of
 the redirect character in our array of arguments. The same function is applied
 to each character with minor differences including the channel (stdin or stdout)
 and the according character to search arguments for. Once the position of the
@@ -82,7 +82,7 @@ and the array of parameters is executed. If the file is unable to be opened, or
 if the redirect character is in an inappropriate positon, the proper error is
 thrown.
 ## Process Structure Type
-        To keep track of each process and its properties, we defined a struct
+To keep track of each process and its properties, we defined a struct
 (deprecated due to broken code) for each command and its arguments. To construct
 the structure, an input of an array of strings is taken. The array of strings is
 the previously parsed strtok returns. This would operate while iterating over
@@ -102,7 +102,7 @@ easy organization and reading. Which is what we would say if my portion of
 dynamic piping and redirecting works.
 
 ## Closing Remarks
-        Although the scope of our submitted code is lacking in comparison with our
+Although the scope of our submitted code is lacking in comparison with our
 ambitious plans, we feel that we have learned an enormous amount about how the
 unix environment works and stores files, how redirection works by duping over
 i/o channels, and how piping can be used to perform inter-process communication.
