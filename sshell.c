@@ -52,6 +52,7 @@ org_cmd* organizeProcesses(org_cmd usrProcessArr[],
     for (int i = 0; i < numCmds; i++) {
         if (!strncmp(inputCmds[i], "|", 1))
         {
+	    usrProcessArr[p].processArgs[i] = malloc(sizeof(char));
 	    usrProcessArr[p].processArgs[i] = NULL;
 
             usrProcessArr[p].pipeOut = true;
@@ -63,6 +64,8 @@ org_cmd* organizeProcesses(org_cmd usrProcessArr[],
             continue;
         }
         if (!strncmp(inputCmds[i], "<", 1)) { //input redir, program < file
+	
+	    usrProcessArr[p].processArgs[i] = malloc(sizeof(char));
             usrProcessArr[p].processArgs[i] = NULL;
 	    
 	    usrProcessArr[p].redirIn = true;
@@ -76,6 +79,8 @@ org_cmd* organizeProcesses(org_cmd usrProcessArr[],
             continue;
         }
         if (!strncmp(inputCmds[i], ">", 1)) {
+	    
+	    usrProcessArr[p].processArgs[i] = malloc(sizeof(char));
 	    usrProcessArr[p].processArgs[i] = NULL;
 
             usrProcessArr[p].redirOut = true;
@@ -369,7 +374,7 @@ void forkSetRun(int pipe_count, org_cmd* org_cmd_array) {
           else if (myProcessIndex == processCount - 1) {
             dup2(pipefds[myProcessIndex - 1][1], STDIN_FILENO);
             if (org_cmd_array[myProcessIndex].redirIn) {
-              int redirfd = open(org_cmd_array[myProcessIndex].filename, O_WRONLY);
+              int redirfd = open(org_cmd_array[myProcessIndex].filename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
               dup2(redirfd, STDOUT_FILENO);
             }
           }
