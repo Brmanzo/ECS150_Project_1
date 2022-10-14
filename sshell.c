@@ -11,7 +11,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-/* cmdline Macros according to assignment specifications */
+/* Cmdline macros according to assignment specifications. */
 #define CMDLINE_MAX 512
 #define USR_ARG_MAX 16
 #define TOK_LEN_MAX 32
@@ -74,16 +74,19 @@ void error_handler(int error_code)
 /* function to clear the array of strings buffer */
 void buf_clear(int arg_num, char** arg_array)
 {
+    /* Sets all occupied elements to NULL. */
     for (int i = 0; i < arg_num; i++)
         memset(arg_array[i], 0, strlen(arg_array[i]));
+    /* Ensures final element is NULL. */
     arg_array[arg_num - 1] = NULL;
 }
-/* This function inserts spaces surrounding the redirect characters */
-/* in order to account for the edge case where there is no space    */
-char* redir_space(char* cmd, int* pipe_num, int* in_redir_num, int* out_redir_num)
+/* This function inserts spaces surrounding the redirect and pipe   */
+/* characters  to account for the edge case where there's no space. */
+char* insert_spaces(char* cmd, int* pipe_num, int* in_redir_num, int* out_redir_num)
 {
-    char buf_cmd[CMDLINE_MAX + 1];
-    memset(buf_cmd, 0, sizeof(buf_cmd));
+    /* Buffer to hold resulting command line with spaces inserted. */
+    char cmd_line_buf[CMDLINE_MAX + 1];
+    memset(cmd_line_buf, 0, sizeof(cmd_line_buf));
     int j = 0;
 
     /* Looks for the characters <, >, and | and inserts spaces surrounding them */
@@ -91,71 +94,80 @@ char* redir_space(char* cmd, int* pipe_num, int* in_redir_num, int* out_redir_nu
     {
         if (cmd[i] == '<')
         {
+            if (*pipe_num != 0)
+                error_handler(MISLOC_IN_DIR);
             (*in_redir_num)++;
-            buf_cmd[j] = ' ';
+            cmd_line_buf[j] = ' ';
             j++;
-            buf_cmd[j] = '<';
+            cmd_line_buf[j] = '<';
             j++;
-            buf_cmd[j] = ' ';
+            cmd_line_buf[j] = ' ';
             j++;
         }
         else if (cmd[i] == '>')
         {
             (*out_redir_num)++;
-            buf_cmd[j] = ' ';
+            cmd_line_buf[j] = ' ';
             j++;
-            buf_cmd[j] = '>';
+            cmd_line_buf[j] = '>';
             j++;
-            buf_cmd[j] = ' ';
+            cmd_line_buf[j] = ' ';
             j++;
         }
         else if (cmd[i] == '|')
         {
+            if (*in_redir_num != 0)
+                error_handler(MISLOC_OUT_DIR);
+            if (*out_redir_num != 0)
+                error_handler(MISLOC_IN_DIR);
             (*pipe_num)++;
-            buf_cmd[j] = ' ';
+            cmd_line_buf[j] = ' ';
             j++;
-            buf_cmd[j] = '|';
+            cmd_line_buf[j] = '|';
             j++;
-            buf_cmd[j] = ' ';
+            cmd_line_buf[j] = ' ';
             j++;
             /* Otherwise it simply buffers the character into the new array */
         }
         else {
-            buf_cmd[j] = cmd[i];
+            cmd_line_buf[j] = cmd[i];
             j++;
         }
     }
-    return strdup(buf_cmd);
+    return strdup(cmd_line_buf);
 }
-/* This function splits the input cmd string into an */
-/* array of strings by treating spaces as tokens.    */
+/* This function splits the input cmd string into an array of strings */
+/* by treating spaces as tokens. Returns total amount of argyments.   */
 int funct_parse(char* cmd, char** arg_array, int* pipe_num, int* in_redir_num, int* out_redir_num)
 {
     /* Inserts spaces surrounding redirection characters */
-    char* buf_arr = redir_space(cmd, pipe_num, in_redir_num, out_redir_num);
+    char* buf_arr = insert_spaces(cmd, pipe_num, in_redir_num, out_redir_num);
     int arg_num = 0;
 
-    char* cmd_arg = strtok(buf_arr, " \n");
+    /* string of arguments separated by spaces. */
+    char* spaced_cmd_args = strtok(buf_arr, " \n");
 
     /* Splits cmd string into an array of strings on every space. */
-    /* The redundant space inserts by redir_space are ignored.    */
-    while (cmd_arg != NULL)
+    /* The redundant space inserts by space_insert are ignored.    */
+    while (spaced_cmd_args != NULL)
     {
-        arg_array[arg_num] = cmd_arg;
+        arg_array[arg_num] = spaced_cmd_args;
         arg_num++;
 
-        cmd_arg = strtok(NULL, " ");
+        spaced_cmd_args = strtok(NULL, " ");
     }
     if (arg_num > USR_ARG_MAX)
     {
         error_handler(TOO_MANY_ARGS);
         return(-1);
     }
-
     arg_array[arg_num] = NULL;
 
-    if ((!strcmp(arg_array[0], ">")) || (!strcmp(arg_array[0], "|")) || (!strcmp(arg_array[arg_num - 1], "|")))
+    if ((!strcmp(arg_array[0], ">")) || (!strcmp(arg_array[0], "|")) || (!strcmp(arg_array[arg_num - 1], "|"))) {
         error_handler(MISSING_CMD);
+        return(-1);
+    }
+
     if ((!strcmp(arg_array[arg_num - 1], ">")))
     {
         error_handler(NO_OUTPUT_F);
@@ -205,6 +217,7 @@ int built_in_funct(char** arg_array, char** dir_stack, char* pwd_buf,
         if (DirEntry == 0)
         {
             int i = *dir_num;
+            /* Creates new room for cwd independent from the buffer. */
             dir_stack[i] = malloc(sizeof(char) * CMDLINE_MAX);
             getcwd(stack_buf, CMDLINE_MAX);
             strcpy(dir_stack[i], stack_buf);
@@ -256,55 +269,57 @@ int built_in_funct(char** arg_array, char** dir_stack, char* pwd_buf,
     }
 }
 int Pipe(char** arg_array, int arg_num) {
-        int fd[2];
-        int i = 0;
-        int pipe_pos = 0;
-        int status = 0;
+    /* File descriptor array to pass to pipe. */
+    int fd[2];
+    int i = 0;
+    int pipe_pos = 0;
+    int status = 0;
 
-        char* command_1[USR_ARG_MAX];
-        char* command_2[USR_ARG_MAX];
+    /* Instantating separate command string arrays to execvp(). */
+    char* command_1[USR_ARG_MAX];
+    char* command_2[USR_ARG_MAX];
 
-        while(strcmp(arg_array[i], "|"))
-        {
-            command_1[i] = arg_array[i];
-            fprintf(stderr, "command_1[%d] : %s\n", i, arg_array[i]);
-            i++;
-            pipe_pos++;
-        }
-        command_1[i] = NULL;
+    /* Up until the pipe, put the command and arguments in command_1[]. */
+    while (strcmp(arg_array[i], "|"))
+    {
+        command_1[i] = arg_array[i];
+        i++;
+        pipe_pos++;
+    }
+    command_1[i] = NULL;
 
+    /* From the pipe to the end of arg_array, put */
+    /* the command and arguments into command_2[]. */
+    for (int j = pipe_pos + 1; j < arg_num; j++)
+    {
+        command_2[j - pipe_pos - 1] = arg_array[j];
+    }
+    command_2[arg_num - pipe_pos] = NULL;
 
-        for(int j = pipe_pos + 1; j < arg_num; j++)
-        {
-            command_2[j - pipe_pos - 1] = arg_array[j];
-            fprintf(stderr, "command_2[%d] : %s\n", j - pipe_pos - 1, arg_array[j]);
-        }
-        command_2[arg_num - pipe_pos] = NULL;
+    status = pipe(fd);
+    /* Pipe Parent Process*/
+    if (fork() != 0) {
+        close(fd[0]);
+        /* connect output of command_1 to input of pipe. */
+        dup2(fd[1], STDOUT_FILENO);
+        /* Close redundant output. */
+        close(fd[1]);
 
+        /* Execute command_1 as the parent */
+        execvp(command_1[0], command_1);
+    }
+    else {            /* Child */
+     /* No need for write access */
+        close(fd[1]);
+        /* Connect output of pipe to input of command_2 */
+        dup2(fd[0], STDIN_FILENO);
+        /* Close redundant input */
+        close(fd[0]);
 
-        status = pipe(fd);
-        if (fork() != 0) {  /* Parent */
-            /* No need for read access */
-            close(fd[0]);
-            /* Replace stdout with pipe */
-            dup2(fd[1], STDOUT_FILENO);
-            /* Close now unused FD */
-            close(fd[1]);
-
-            /* Parent becomes process1 */
-            execvp(command_1[0], command_1);
-        }
-        else {            /* Child */
-         /* No need for write access */
-            close(fd[1]);
-            /* Replace stdin with pipe */
-            dup2(fd[0], STDIN_FILENO);
-            /* Close now unused FD */
-            close(fd[0]);
-            /* Child becomes process2 */
-            execvp(command_2[0], command_2);
-        }
-        return(status);
+        /* Execute command_2 as the child */
+        execvp(command_2[0], command_2);
+    }
+    return(status);
 }
 int Redirect(int in_redir_num, int out_redir_num, char** arg_array, int arg_num) {
     int fd = 0;
@@ -312,6 +327,7 @@ int Redirect(int in_redir_num, int out_redir_num, char** arg_array, int arg_num)
     char* redir_char;
     int channel;
 
+    /* Sets channel to stdout and character to the output redirect. */
     if ((in_redir_num == 0) && (out_redir_num > 0))
     {
         fd = open(arg_array[arg_num - 1], O_WRONLY | O_CREAT | O_TRUNC, 0644);
@@ -319,6 +335,7 @@ int Redirect(int in_redir_num, int out_redir_num, char** arg_array, int arg_num)
         /* STDOUT_FILE_NO */
         channel = 1;
     }
+    /* Otherwise sets channel to stdin and character to the input redirect. */
     else
     {
         fd = open(arg_array[arg_num - 1], O_RDONLY);
@@ -326,20 +343,23 @@ int Redirect(int in_redir_num, int out_redir_num, char** arg_array, int arg_num)
         /* STDIN_FILE_NO */
         channel = 0;
     }
-    char* par_array[USR_ARG_MAX];
+    /* Array to store command arguments before the redirect character. */
+    char* parameter_array[USR_ARG_MAX];
 
     while (strcmp(arg_array[i], redir_char))
     {
-        par_array[i] = arg_array[i];
+        parameter_array[i] = arg_array[i];
         i++;
     }
-    par_array[i] = NULL;
+    /* Ensures final string in array is NULL. */
+    parameter_array[i] = NULL;
 
+    /* If file opened successfully, is duped over input/output and executed. */
     if (fd >= 0)
     {
         dup2(fd, channel);
         close(fd);
-        execvp(arg_array[0], par_array);
+        execvp(arg_array[0], parameter_array);
         _exit(1);
     }
     else
@@ -347,16 +367,17 @@ int Redirect(int in_redir_num, int out_redir_num, char** arg_array, int arg_num)
         if (channel)
         {
             error_handler(CANT_OPEN_OUT_F);
-            return(2);
+            return(-1);
         }
         else
         {
             error_handler(CANT_OPEN_IN_F);
-            return(2);
+            return(-1);
         }
     }
 }
-/* Custom system function to execute the shell command. */
+/* Custom system function to execute the shell     */
+/* commands while enabling piping and redirection. */
 int our_system(char** arg_array, int* pipe_num, int* in_redir_num, int* out_redir_num, int arg_num)
 {
     int status = 0;
@@ -485,8 +506,10 @@ int main(void)
                     retval = our_system(arg_array, &pipe_num, &in_redir_num, &out_redir_num, arg_num);
 
                     /* Returns value from non-exit command */
-                    if (retval != 0)
+                    if ((retval != 0))
                     {
+                        if ((retval != -1))
+                            continue;
                         error_handler(CMD_NOT_FOUND);
                         fprintf(stderr, "+ completed '%s' [1]\n", cmd);
                     }
