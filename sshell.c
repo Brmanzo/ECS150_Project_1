@@ -368,12 +368,15 @@ void forkSetRun(int pipe_count, org_cmd* org_cmd_array) {
             dup2(pipefds[myProcessIndex][0], STDOUT_FILENO);
             if (org_cmd_array[myProcessIndex].redirIn) {
               int redirfd = open(org_cmd_array[myProcessIndex].filename, O_RDONLY);
+	      if(redirfd == -1) {
+	      	fprintf(stderr, "FOPEN FAILED");
+	      }
               dup2(redirfd, STDIN_FILENO);
             }
           }
           else if (myProcessIndex == processCount - 1) {
             dup2(pipefds[myProcessIndex - 1][1], STDIN_FILENO);
-            if (org_cmd_array[myProcessIndex].redirIn) {
+            if (org_cmd_array[myProcessIndex].redirOut) {
               int redirfd = open(org_cmd_array[myProcessIndex].filename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
               dup2(redirfd, STDOUT_FILENO);
             }
@@ -407,6 +410,8 @@ void forkSetRun(int pipe_count, org_cmd* org_cmd_array) {
     	fprintf(stderr, "Return Value is: %d for PID: %d\n", retvals[l], PIDs[l]);
     }
     return;
+
+    //still close files, malloc
 }
 /* Custom system function to execute the shell command. */
 int our_system(char** arg_array, org_cmd* org_cmd_array, int* redir_num, int* pipe_num)
