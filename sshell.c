@@ -323,6 +323,7 @@ int Pipe(char** arg_array, int arg_num) {
     /* Execute command_2 as the child */
     execvp(command_2[0], command_2);
   }
+  /* Source: Professor's Syscall Lecture Code */
   return(status);
 }
 int Redirect(int in_redir_num, int out_redir_num, char** arg_array,
@@ -368,6 +369,7 @@ int Redirect(int in_redir_num, int out_redir_num, char** arg_array,
     execvp(arg_array[0], parameter_array);
     _exit(1);
   }
+  /* Source: Professor's Syscall Lecture Code. */
   /* Otherwise throws appropriate file opening error. */
   else
   {
@@ -459,7 +461,7 @@ int main(void)
     out_redir_num = 0;
 
     /* Print prompt */
-    printf("sshell$ ");
+    printf("sshell@ucd$ ");
     fflush(stdout);
 
     /* Get command line */
@@ -515,8 +517,8 @@ int main(void)
           /* Returns value from non-exit command */
           if ((retval != 0))
           {
-            if ((retval != -1))
-              continue;
+            //if ((retval != 0))
+            //  continue;
             error_handler(CMD_NOT_FOUND);
             fprintf(stderr, "+ completed '%s' [1]\n", cmd);
           }
