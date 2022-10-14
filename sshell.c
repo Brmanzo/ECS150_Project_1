@@ -11,6 +11,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+/* cmdline Macros according to assignment specifications */
 #define CMDLINE_MAX 512
 #define USR_ARG_MAX 16
 #define TOK_LEN_MAX 32
@@ -85,7 +86,7 @@ char* redir_space(char* cmd, int* pipe_num, int* in_redir_num, int* out_redir_nu
     memset(buf_cmd, 0, sizeof(buf_cmd));
     int j = 0;
 
-    /* Looks for the characters < and > and inserts spaces surrounding them */
+    /* Looks for the characters <, >, and | and inserts spaces surrounding them */
     for (unsigned int i = 0; i < strlen(cmd); i++)
     {
         if (cmd[i] == '<')
@@ -108,11 +109,14 @@ char* redir_space(char* cmd, int* pipe_num, int* in_redir_num, int* out_redir_nu
             buf_cmd[j] = ' ';
             j++;
         }
-        /* If the character is a pipe, it increments pipe_num for our piping. */
         else if (cmd[i] == '|')
         {
             (*pipe_num)++;
-            buf_cmd[j] = cmd[i];
+            buf_cmd[j] = ' ';
+            j++;
+            buf_cmd[j] = '|';
+            j++;
+            buf_cmd[j] = ' ';
             j++;
             /* Otherwise it simply buffers the character into the new array */
         }
@@ -251,51 +255,99 @@ int built_in_funct(char** arg_array, char** dir_stack, char* pwd_buf,
         }
     }
 }
+int Pipe(char** arg_array, int arg_num) {
+        int fd[2];
+        int i = 0;
+        int pipe_pos = 0;
+        int status = 0;
+
+        char* command_1[USR_ARG_MAX];
+        char* command_2[USR_ARG_MAX];
+
+        while(strcmp(arg_array[i], "|"))
+        {
+            command_1[i] = arg_array[i];
+            fprintf(stderr, "command_1[%d] : %s\n", i, arg_array[i]);
+            i++;
+            pipe_pos++;
+        }
+        command_1[i] = NULL;
+
+
+        for(int j = pipe_pos + 1; j < arg_num; j++)
+        {
+            command_2[j - pipe_pos - 1] = arg_array[j];
+            fprintf(stderr, "command_2[%d] : %s\n", j - pipe_pos - 1, arg_array[j]);
+        }
+        command_2[arg_num - pipe_pos] = NULL;
+
+
+        status = pipe(fd);
+        if (fork() != 0) {  /* Parent */
+            /* No need for read access */
+            close(fd[0]);
+            /* Replace stdout with pipe */
+            dup2(fd[1], STDOUT_FILENO);
+            /* Close now unused FD */
+            close(fd[1]);
+
+            /* Parent becomes process1 */
+            execvp(command_1[0], command_1);
+        }
+        else {            /* Child */
+         /* No need for write access */
+            close(fd[1]);
+            /* Replace stdin with pipe */
+            dup2(fd[0], STDIN_FILENO);
+            /* Close now unused FD */
+            close(fd[0]);
+            /* Child becomes process2 */
+            execvp(command_2[0], command_2);
+        }
+        return(status);
+}
 int Redirect(int in_redir_num, int out_redir_num, char** arg_array, int arg_num) {
     int fd = 0;
     int i = 0;
-
-    char* par_array[USR_ARG_MAX];
+    char* redir_char;
+    int channel;
 
     if ((in_redir_num == 0) && (out_redir_num > 0))
     {
-        while (strcmp(arg_array[i], ">"))
-        {
-            par_array[i] = arg_array[i];
-            i++;
-        }
-        par_array[i] = NULL;
-
         fd = open(arg_array[arg_num - 1], O_WRONLY | O_CREAT | O_TRUNC, 0644);
-        if (fd >= 0)
-        {
-            dup2(fd, STDOUT_FILENO);
-            close(fd);
-            execvp(arg_array[0], par_array);
-            _exit(1);
-        }
-        else
-        {
-            error_handler(CANT_OPEN_OUT_F);
-            return(2);
-        }
+        redir_char = ">";
+        /* STDOUT_FILE_NO */
+        channel = 1;
     }
     else
     {
-        while (strcmp(arg_array[i], "<"))
-        {
-            par_array[i] = arg_array[i];
-            i++;
-        }
-        par_array[i] = NULL;
-
         fd = open(arg_array[arg_num - 1], O_RDONLY);
-        if (fd >= 0)
+        redir_char = "<";
+        /* STDIN_FILE_NO */
+        channel = 0;
+    }
+    char* par_array[USR_ARG_MAX];
+
+    while (strcmp(arg_array[i], redir_char))
+    {
+        par_array[i] = arg_array[i];
+        i++;
+    }
+    par_array[i] = NULL;
+
+    if (fd >= 0)
+    {
+        dup2(fd, channel);
+        close(fd);
+        execvp(arg_array[0], par_array);
+        _exit(1);
+    }
+    else
+    {
+        if (channel)
         {
-            dup2(fd, STDIN_FILENO);
-            close(fd);
-            execvp(arg_array[0], par_array);
-            _exit(1);
+            error_handler(CANT_OPEN_OUT_F);
+            return(2);
         }
         else
         {
@@ -323,6 +375,12 @@ int our_system(char** arg_array, int* pipe_num, int* in_redir_num, int* out_redi
         {
             status = Redirect(*in_redir_num, *out_redir_num, arg_array, arg_num);
             _exit(1);
+        }
+        else if ((*in_redir_num == 0) && (*out_redir_num == 0) && (*pipe_num > 0)) {
+            status = Pipe(arg_array, arg_num);
+        }
+        else if ((*in_redir_num == 1) && (*pipe_num > 0)) {
+            error_handler(MISLOC_IN_DIR);
         }
     }
     /* The fork failed. Report failure. */
@@ -423,6 +481,7 @@ int main(void)
 
                     /* Calls System to execute non-exit command, actual command*/
                     /* identification takes place in our_system function       */
+
                     retval = our_system(arg_array, &pipe_num, &in_redir_num, &out_redir_num, arg_num);
 
                     /* Returns value from non-exit command */
