@@ -53,7 +53,7 @@ org_cmd* organizeProcesses(org_cmd usrProcessArr[],
         if (!strncmp(inputCmds[i], "|", 1))
         {
 	    usrProcessArr[p].processArgs[i] = malloc(sizeof(char));
-	    &usrProcessArr[p].processArgs[i] = NULL;
+	    usrProcessArr[p].processArgs[i] = NULL;
 
             usrProcessArr[p].pipeOut = true;
             usrProcessArr[++p].pipeIn = true;
@@ -66,10 +66,12 @@ org_cmd* organizeProcesses(org_cmd usrProcessArr[],
         if (!strncmp(inputCmds[i], "<", 1)) { //input redir, program < file
 	
 	    usrProcessArr[p].processArgs[i] = malloc(sizeof(char));
-            &usrProcessArr[p].processArgs[i] = NULL;
+            usrProcessArr[p].processArgs[i] = NULL;
 	    
 	    usrProcessArr[p].redirIn = true;
-            strcpy(usrProcessArr[p].filename, inputCmds[i + 1]);
+            
+	    fprintf(stderr, "INPUT REDIR\n");
+	    strcpy(usrProcessArr[p].filename, inputCmds[i + 1]);
             i++;
             firstArg = false;
             argCount = 0;
@@ -81,10 +83,12 @@ org_cmd* organizeProcesses(org_cmd usrProcessArr[],
         if (!strncmp(inputCmds[i], ">", 1)) {
 	    
 	    usrProcessArr[p].processArgs[i] = malloc(sizeof(char));
-	    &usrProcessArr[p].processArgs[i] = NULL;
+	    usrProcessArr[p].processArgs[i] = NULL;
 
             usrProcessArr[p].redirOut = true;
-            strcpy(usrProcessArr[p].filename, inputCmds[i + 1]);
+
+	    fprintf(stderr, "OUTPUT REDIR\n");
+	    strcpy(usrProcessArr[p].filename, inputCmds[i + 1]);
             i++;
             firstArg = false;
 
@@ -94,16 +98,19 @@ org_cmd* organizeProcesses(org_cmd usrProcessArr[],
         }
         if (firstArg)
         {
+	    fprintf(stderr, "PROCESS NAME\n");
             strcpy(usrProcessArr[p].processName, inputCmds[i]);
             firstArg = false;
             argCount = 0;
 
-            //printf("Name: %s\n", usrProcessArr[p].processName);
+            //printf("Namde: %s\n", usrProcessArr[p].processName);
             fflush(stdout);
         }
         else {
             usrProcessArr[p].processArgs[argCount] = malloc(sizeof(char) * (strlen(inputCmds[i]) + 1));
-            strcpy(usrProcessArr[p].processArgs[argCount], inputCmds[i]);
+            
+	    fprintf(stderr, "ARGS\n");
+	    strcpy(usrProcessArr[p].processArgs[argCount], inputCmds[i]);
             argCount++;
 
             //printf("Arg %d: %s\n", argCount - 1, 
