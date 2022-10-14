@@ -362,6 +362,7 @@ int Redirect(int in_redir_num, int out_redir_num, char** arg_array, int arg_num)
         execvp(arg_array[0], parameter_array);
         _exit(1);
     }
+    /* Otherwise throws appropriate file opening error. */
     else
     {
         if (channel)
