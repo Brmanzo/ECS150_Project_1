@@ -53,7 +53,7 @@ org_cmd* organizeProcesses(org_cmd usrProcessArr[],
         if (!strncmp(inputCmds[i], "|", 1))
         {
 	    usrProcessArr[p].processArgs[i] = malloc(sizeof(char));
-	    usrProcessArr[p].processArgs[i] = NULL;
+	    &usrProcessArr[p].processArgs[i] = NULL;
 
             usrProcessArr[p].pipeOut = true;
             usrProcessArr[++p].pipeIn = true;
@@ -66,7 +66,7 @@ org_cmd* organizeProcesses(org_cmd usrProcessArr[],
         if (!strncmp(inputCmds[i], "<", 1)) { //input redir, program < file
 	
 	    usrProcessArr[p].processArgs[i] = malloc(sizeof(char));
-            usrProcessArr[p].processArgs[i] = NULL;
+            &usrProcessArr[p].processArgs[i] = NULL;
 	    
 	    usrProcessArr[p].redirIn = true;
             strcpy(usrProcessArr[p].filename, inputCmds[i + 1]);
@@ -81,7 +81,7 @@ org_cmd* organizeProcesses(org_cmd usrProcessArr[],
         if (!strncmp(inputCmds[i], ">", 1)) {
 	    
 	    usrProcessArr[p].processArgs[i] = malloc(sizeof(char));
-	    usrProcessArr[p].processArgs[i] = NULL;
+	    &usrProcessArr[p].processArgs[i] = NULL;
 
             usrProcessArr[p].redirOut = true;
             strcpy(usrProcessArr[p].filename, inputCmds[i + 1]);
@@ -102,8 +102,7 @@ org_cmd* organizeProcesses(org_cmd usrProcessArr[],
             fflush(stdout);
         }
         else {
-            usrProcessArr[p].processArgs[argCount] = malloc(sizeof(char)
-                * strlen(inputCmds[i]));
+            usrProcessArr[p].processArgs[argCount] = malloc(sizeof(char) * (strlen(inputCmds[i]) + 1));
             strcpy(usrProcessArr[p].processArgs[argCount], inputCmds[i]);
             argCount++;
 
@@ -112,7 +111,7 @@ org_cmd* organizeProcesses(org_cmd usrProcessArr[],
             fflush(stdout);
         }
     }
-
+	// make sure to delete data
     return usrProcessArr;
 }
 /* Enums to pass when handling errors. */
