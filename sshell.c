@@ -72,7 +72,7 @@ org_cmd* organizeProcesses(org_cmd usrProcessArr[],
             
 	    fprintf(stderr, "INPUT REDIR\n");
 	    strcpy(usrProcessArr[p].filename, inputCmds[i + 1]);
-	    fprintf(stderr, "%s\n", usrProcessArr[p].filename);
+	    fprintf(stderr, "%s\n", inputCmds[i+1]);
             i++;
             firstArg = false;
             argCount = 0;
@@ -90,7 +90,7 @@ org_cmd* organizeProcesses(org_cmd usrProcessArr[],
 
 	    fprintf(stderr, "OUTPUT REDIR\n");
 	    strcpy(usrProcessArr[p].filename, inputCmds[i + 1]);
-	    fprintf(stderr, "%s\n", usrProcessArr[p].filename);
+	    fprintf(stderr, "%s\n", inputCmds[i+1]);
 	    
             i++;
             firstArg = false;
@@ -366,7 +366,12 @@ void forkSetRun(int pipe_count, org_cmd* org_cmd_array) {
 	fprintf(stderr, "Pipe %d Failed\n", i);
 	_exit(1);
 	}
+	fprintf(stderr, "FD Pipe%d In: %d, Out: %d\n", i, pipefds[i][0], pipefds[i][1]);
     }
+
+    
+
+
     for (int j = 0; j < processCount; j++) {
 	//sleep(1 + myProcessIndex); //Guarantees process n runs before n+1. Useful for testing
         PIDs[j] = fork();
@@ -378,8 +383,9 @@ void forkSetRun(int pipe_count, org_cmd* org_cmd_array) {
             if (org_cmd_array[myProcessIndex].redirIn) {
               int redirfd = open(org_cmd_array[myProcessIndex].filename, O_RDONLY);
 	      if(redirfd == -1) {
-	      	fprintf(stderr, "FOPEN FAILED");
+	      	fprintf(stderr, "FOPEN FAILED\n");
 	      }
+	      fprintf(stderr, "This is the open FD: %d\n", redirfd);
               dup2(redirfd, STDIN_FILENO);
             }
           }
@@ -387,6 +393,10 @@ void forkSetRun(int pipe_count, org_cmd* org_cmd_array) {
             dup2(pipefds[myProcessIndex - 1][1], STDIN_FILENO);
             if (org_cmd_array[myProcessIndex].redirOut) {
               int redirfd = open(org_cmd_array[myProcessIndex].filename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+	      if(redirfd == -1) {
+		fprintf(stderr, "FOPEN FAILED\n");
+	      }
+	      fprintf(stderr, "This is the open FD: %d\n", redirfd);
               dup2(redirfd, STDOUT_FILENO);
             }
           }
@@ -396,10 +406,8 @@ void forkSetRun(int pipe_count, org_cmd* org_cmd_array) {
           }
 
           for (int k = 0; k < processCount - 1; k++) {
-            int pipeFDIn = 3 + (2 * k);
-            int pipeFDOut = 4 + (2 * k);
-            close(pipeFDIn);
-            close(pipeFDOut);
+            //close(pipefds[k][0]);
+            //close(pipefds[k][1]);
           }
 
           execvp(org_cmd_array[myProcessIndex].processName, org_cmd_array[myProcessIndex].processArgs);
