@@ -369,17 +369,16 @@ void forkSetRun(int pipe_count, org_cmd* org_cmd_array) {
 	fprintf(stderr, "FD Pipe%d In: %d, Out: %d\n", i, pipefds[i][1], pipefds[i][0]);
     }
 
-    
-
-
     for (int j = 0; j < processCount; j++) {
-	//sleep(1 + myProcessIndex); //Guarantees process n runs before n+1. Useful for testing
+	// sleep(1 + myProcessIndex); // Guarantees process n runs before n+1. Useful for testing
         PIDs[j] = fork();
 
 	if (!PIDs[j]) { //child process
 	  fprintf(stderr,"This is Process %d. I am running %s.\n", myProcessIndex, org_cmd_array[myProcessIndex].processName);
 	  if (myProcessIndex == 0) {
+	    close(pipefds[myProcessIndex][0]);
             dup2(pipefds[myProcessIndex][1], STDOUT_FILENO);
+	    close(pipefds[myProcessIndex][1]);// close redundant input
             if (org_cmd_array[myProcessIndex].redirIn) {
               int redirfd = open(org_cmd_array[myProcessIndex].filename, O_RDONLY);
 	      if(redirfd == -1) {
@@ -390,8 +389,10 @@ void forkSetRun(int pipe_count, org_cmd* org_cmd_array) {
             }
           }
           else if (myProcessIndex == processCount - 1) {
-            dup2(pipefds[myProcessIndex - 1][0], STDIN_FILENO);
-            if (org_cmd_array[myProcessIndex].redirOut) {
+            close(pipefds[myProcessIndex][1]);
+	    dup2(pipefds[myProcessIndex - 1][0], STDIN_FILENO);
+            close(pipefds[myProcessIndex - 1][0]);// close redundant output
+	    if (org_cmd_array[myProcessIndex].redirOut) {
               int redirfd = open(org_cmd_array[myProcessIndex].filename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
 	      if(redirfd == -1) {
 		fprintf(stderr, "FOPEN FAILED\n");
@@ -406,8 +407,8 @@ void forkSetRun(int pipe_count, org_cmd* org_cmd_array) {
           }
 
           for (int k = 0; k < processCount - 1; k++) {
-            //close(pipefds[k][0]);
-            //close(pipefds[k][1]);
+            close(pipefds[k][0]);
+            close(pipefds[k][1]);
           }
 
           execvp(org_cmd_array[myProcessIndex].processName, org_cmd_array[myProcessIndex].processArgs);
@@ -417,8 +418,7 @@ void forkSetRun(int pipe_count, org_cmd* org_cmd_array) {
             myProcessIndex++;
         }
     }
-    //Everything after above for loop is supposed to be parent only process
-    //int status = 0;
+    // Everything after above for loop is supposed to be parent only process
     int retvals[processCount];
     for (int l = 0; l < processCount; l++) {
     	retvals[l] = waitpid(PIDs[l], NULL, 0);
@@ -427,8 +427,6 @@ void forkSetRun(int pipe_count, org_cmd* org_cmd_array) {
     	fprintf(stderr, "Return Value is: %d for PID: %d\n", retvals[l], PIDs[l]);
     }
     return;
-
-    //still close files, malloc
 }
 /* Custom system function to execute the shell command. */
 int our_system(char** arg_array, org_cmd* org_cmd_array, int* redir_num, int* pipe_num)
@@ -443,12 +441,10 @@ int our_system(char** arg_array, org_cmd* org_cmd_array, int* redir_num, int* pi
     {
         if ((*redir_num == 0) && (*pipe_num == 0)) {
             /* using execv for array of arguments, -p to access PATH variables. */
-fprintf(stderr, "HERE\n");
             execvp(arg_array[0], arg_array);
             _exit(1);
         }
         else {
-fprintf(stderr, "THERE\n");
             forkSetRun(*pipe_num, org_cmd_array);
             _exit(1);
         }
