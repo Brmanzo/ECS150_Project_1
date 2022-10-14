@@ -21,16 +21,11 @@ typedef struct org_cmd {
     char* processArgs[USR_ARG_MAX + 1];
     char filename[TOK_LEN_MAX + 1];
 
-    // To allow / deny usage of fdIn and fdOut variables
-    // Possible that we only need one set, to remove if needed later
+    // To allow / deny usage of fdIn and fdOut variables, error handling
     bool pipeIn;
     bool pipeOut;
     bool redirIn;
     bool redirOut;
-
-    // To be initialized after
-    int fdIn;
-    int fdOut;
 }org_cmd;
 
 // Declare array of struct outside of this scope and pass by reference
@@ -50,78 +45,44 @@ org_cmd* organizeProcesses(org_cmd usrProcessArr[],
         usrProcessArr[j].redirOut = false;
     }
     for (int i = 0; i < numCmds; i++) {
-        if (!strncmp(inputCmds[i], "|", 1))
-        {
+        if (!strncmp(inputCmds[i], "|", 1)) {
 	    usrProcessArr[p].processArgs[i] = malloc(2 * sizeof(char*));
 	    usrProcessArr[p].processArgs[i] = NULL;
-
             usrProcessArr[p].pipeOut = true;
             usrProcessArr[++p].pipeIn = true;
             firstArg = true;
-
-            //printf("Pipe\n");
-            fflush(stdout);
             continue;
         }
-        if (!strncmp(inputCmds[i], "<", 1)) { //input redir, program < file
-	
+        if (!strncmp(inputCmds[i], "<", 1)) { //input redir, program < file	
 	    usrProcessArr[p].processArgs[i] = malloc(2 * sizeof(char*));
             usrProcessArr[p].processArgs[i] = NULL;
-	    
 	    usrProcessArr[p].redirIn = true;
-            
-	    fprintf(stderr, "INPUT REDIR\n");
 	    strcpy(usrProcessArr[p].filename, inputCmds[i + 1]);
-	    fprintf(stderr, "%s\n", inputCmds[i+1]);
-            i++;
+	    i++;
             firstArg = false;
             argCount = 0;
-
-            //printf("Input: %s\n", usrProcessArr[p].filename);
-            fflush(stdout);
             continue;
         }
-        if (!strncmp(inputCmds[i], ">", 1)) {
-	    
+        if (!strncmp(inputCmds[i], ">", 1)) {	    
 	    usrProcessArr[p].processArgs[i] = malloc(2 * sizeof(char*));
 	    usrProcessArr[p].processArgs[i] = NULL;
-
             usrProcessArr[p].redirOut = true;
-
-	    fprintf(stderr, "OUTPUT REDIR\n");
 	    strcpy(usrProcessArr[p].filename, inputCmds[i + 1]);
-	    fprintf(stderr, "%s\n", inputCmds[i+1]);
-	    
-            i++;
+	    i++;
             firstArg = false;
-
-            //printf("Output: %s\n", usrProcessArr[p].filename);
-            fflush(stdout);
-            continue;
+	    continue;
         }
-        if (firstArg)
-        {
+        if (firstArg) {
 	    fprintf(stderr, "PROCESS NAME\n");
             strcpy(usrProcessArr[p].processName, inputCmds[i]);
             firstArg = false;
             argCount = 0;
-
-            //printf("Namde: %s\n", usrProcessArr[p].processName);
-            fflush(stdout);
-        }
-        else {
+        } else {
             usrProcessArr[p].processArgs[argCount] = malloc(sizeof(char) * (strlen(inputCmds[i]) + 1));
-            
-	    fprintf(stderr, "ARGS\n");
 	    strcpy(usrProcessArr[p].processArgs[argCount], inputCmds[i]);
             argCount++;
-
-            //printf("Arg %d: %s\n", argCount - 1, 
-            //  usrProcessArr[p].processArgs[argCount - 1]);
-            fflush(stdout);
         }
     }
-	// make sure to delete data
     return usrProcessArr;
 }
 
@@ -137,7 +98,6 @@ void forkSetRun(int pipe_count, org_cmd* org_cmd_array) {
 	fprintf(stderr, "Pipe %d Failed\n", i);
 	_exit(1);
 	}
-	fprintf(stderr, "FD Pipe%d In: %d, Out: %d\n", i, pipefds[i][1], pipefds[i][0]);
     }
 
     for (int j = 0; j < processCount; j++) {
@@ -145,7 +105,6 @@ void forkSetRun(int pipe_count, org_cmd* org_cmd_array) {
         PIDs[j] = fork();
 
 	if (!PIDs[j]) { //child process
-	  fprintf(stderr,"This is Process %d. I am running %s.\n", myProcessIndex, org_cmd_array[myProcessIndex].processName);
 	  if (myProcessIndex == 0) {
 	    close(pipefds[myProcessIndex][0]);
             dup2(pipefds[myProcessIndex][1], STDOUT_FILENO);
@@ -155,7 +114,6 @@ void forkSetRun(int pipe_count, org_cmd* org_cmd_array) {
 	      if(redirfd == -1) {
 	      	fprintf(stderr, "FOPEN FAILED\n");
 	      }
-	      fprintf(stderr, "This is the open FD: %d\n", redirfd);
               dup2(redirfd, STDIN_FILENO);
             }
           }
@@ -168,7 +126,6 @@ void forkSetRun(int pipe_count, org_cmd* org_cmd_array) {
 	      if(redirfd == -1) {
 		fprintf(stderr, "FOPEN FAILED\n");
 	      }
-	      fprintf(stderr, "This is the open FD: %d\n", redirfd);
               dup2(redirfd, STDOUT_FILENO);
             }
           }
@@ -184,8 +141,7 @@ void forkSetRun(int pipe_count, org_cmd* org_cmd_array) {
 
           execvp(org_cmd_array[myProcessIndex].processName, org_cmd_array[myProcessIndex].processArgs);
           _exit(1);
-        }
-        else {
+        } else {
             myProcessIndex++;
         }
     }
