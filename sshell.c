@@ -18,7 +18,7 @@
 typedef struct org_cmd {
     // Separate Name and Args for execv
     char processName[TOK_LEN_MAX + 1];
-    char* processArgs[USR_ARG_MAX];
+    char* processArgs[USR_ARG_MAX + 1];
     char filename[TOK_LEN_MAX + 1];
 
     // To allow / deny usage of fdIn and fdOut variables
@@ -52,6 +52,8 @@ org_cmd* organizeProcesses(org_cmd usrProcessArr[],
     for (int i = 0; i < numCmds; i++) {
         if (!strncmp(inputCmds[i], "|", 1))
         {
+	    usrProcessArr[p].processArgs[i] = NULL;
+
             usrProcessArr[p].pipeOut = true;
             usrProcessArr[++p].pipeIn = true;
             firstArg = true;
@@ -61,7 +63,9 @@ org_cmd* organizeProcesses(org_cmd usrProcessArr[],
             continue;
         }
         if (!strncmp(inputCmds[i], "<", 1)) { //input redir, program < file
-            usrProcessArr[p].redirIn = true;
+            usrProcessArr[p].processArgs[i] = NULL;
+	    
+	    usrProcessArr[p].redirIn = true;
             strcpy(usrProcessArr[p].filename, inputCmds[i + 1]);
             i++;
             firstArg = false;
@@ -72,6 +76,8 @@ org_cmd* organizeProcesses(org_cmd usrProcessArr[],
             continue;
         }
         if (!strncmp(inputCmds[i], ">", 1)) {
+	    usrProcessArr[p].processArgs[i] = NULL;
+
             usrProcessArr[p].redirOut = true;
             strcpy(usrProcessArr[p].filename, inputCmds[i + 1]);
             i++;
@@ -371,6 +377,7 @@ void forkSetRun(int pipe_count, org_cmd* org_cmd_array) {
             dup2(pipefds[myProcessIndex - 1][1], STDIN_FILENO);
             dup2(pipefds[myProcessIndex][0], STDOUT_FILENO);
           }
+
           for (int k = 0; k < processCount - 1; k++) {
             int pipeFDIn = 3 + (2 * k);
             int pipeFDOut = 4 + (2 * k);
